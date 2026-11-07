@@ -9,7 +9,11 @@ import (
 	"moreops/internal/validator"
 )
 
-var validateConfigPath string
+var (
+	validateConfigPath string
+	validateSecurity   bool
+	validateRBAC       bool
+)
 
 var validateCmd = &cobra.Command{
 	Use:   "validate",
@@ -84,5 +88,7 @@ var validateCmd = &cobra.Command{
 
 func init() {
 	validateCmd.Flags().StringVarP(&validateConfigPath, "config", "c", config.DefaultConfigFileName, "Path to moreops.yaml")
+	validateCmd.Flags().BoolVar(&validateSecurity, "security", false, "Focus audit on security vulnerabilities and container privileges")
+	validateCmd.Flags().BoolVar(&validateRBAC, "rbac", false, "Focus audit on Kubernetes RBAC least-privilege policies")
 	rootCmd.AddCommand(validateCmd)
 }

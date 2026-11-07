@@ -54,7 +54,7 @@ MoreOps полностью покрывает все 7 этапов DevOps-па�
 3. **Phase 3 — Security & Secrets**: Автономный in-cluster dev Vault pod или подключение к External Vault, External Secrets Operator, строгий RBAC, сканирование уязвимостей через Trivy (`moreops scan`).
 4. **Phase 4 — Monitoring & Observability**: Prometheus Operator `ServiceMonitor` (15s скрейп с relabeling подов и нод), `PrometheusRule` (p99 latency, 5xx ошибки, перегрузка CPU, рестарты), преднастроенный Grafana Dashboard (`grafana_dashboard: "1"`).
 5. **Phase 5 — Storage & Backup**: In-cluster MinIO pod, российские и глобальные S3 провайдеры (Yandex Cloud, VK Cloud, Selectel, AWS), Velero BSL и расписания бэкапов, CronJob для дампов баз данных (PostgreSQL / MySQL).
-6. **Phase 6 — Automation & CI/CD**: GitHub Actions и GitLab CI пайплайны (cloud и self-hosted раннеры), GitOps синхронизация через **Argo CD** (дефолт) и Flux CD, OpenTofu/Terraform (`moreops iac plan/apply`), Ansible плейбук настройки хостов.
+6. **Phase 6 — Automation & CI/CD**: Jenkins (`Jenkinsfile`), GitHub Actions и GitLab CI пайплайны (cloud и self-hosted раннеры), GitOps синхронизация через **Argo CD** (дефолт) и Flux CD, OpenTofu/Terraform (`moreops iac plan/apply`), Ansible плейбук настройки хостов.
 7. **Phase 7 — DevOps Platform**: Управление мульти-окружениями (`moreops env list/switch/diff/add`), автоматизация версий и релизов (`moreops release [patch|minor|major]`), полная документация.
 
 ---

@@ -1,41 +1,89 @@
 # MoreOps Modules Reference
 
-Каждый модуль в MoreOps работает независимо и активируется в секции `modules` файла `moreops.yaml`.
+Каждый модуль в MoreOps работает независимо и активируется в секции `modules` файла `moreops.yaml`. MoreOps не изобретает заново утилиты, а оркестрирует лучшие стандарты индустрии.
 
 ---
 
 ## 1. Containers (`containers`)
-- Генерация многоэтапного hardened `Dockerfile` под язык проекта (Go, Node.js, Python, Rust).
-- Генерация `.dockerignore`.
-- Генерация `docker-compose.yml` для локальной разработки со встроенным healthcheck.
+- **Hardened Multi-stage Dockerfile**: генерация минималистичного образа с distroless/alpine рантаймом под язык проекта (Go, Node.js, Python, Java, Rust, .NET).
+- **UID/GID 10001 (Non-root)**: запуск контейнера от непривилегированного пользователя.
+- **Docker Compose**: локальный стек (`docker-compose.yml`) со встроенными healthcheck-проверками.
+- **`.dockerignore`**: исключение лишних файлов, артефактов компиляции и конфиденциальных `.env*`.
+
+---
 
 ## 2. Kubernetes (`kubernetes`)
-- **Helm Chart (стандарт)**: создание структуры чарта `charts/<app>/` с шаблонами Deployment, Service, Ingress, HPA, NetworkPolicy и оверлеями values (`values-dev.yaml`, `values-prod.yaml`).
-- **Kustomize**: структура `k8s/base/` и оверлеи окружений `k8s/overlays/dev/`, `k8s/overlays/prod/`.
-- **Raw Manifests**: изолированные манифесты в `k8s/`.
+- **Helm Chart (дефолтный стандарт)**:
+  - Структура чарта в `charts/<app>/` (Chart.yaml, values.yaml, templates/).
+  - Шаблоны: Deployment, Service, Ingress, HPA, NetworkPolicy (default-deny egress/ingress).
+  - Средовые оверлеи: `values-dev.yaml`, `values-prod.yaml`.
+- **Kustomize**:
+  - Базовые манифесты в `k8s/base/` с `kustomization.yaml`.
+  - Оверлеи окружений в `k8s/overlays/dev/` и `k8s/overlays/prod/`.
+- **Raw Manifests**:
+  - Прямые манифесты для быстрого развертывания в `k8s/`.
+
+---
 
 ## 3. Security & Secrets (`security`)
 - **HashiCorp Vault**:
-  - `in-cluster-dev`: автономный под Vault для локального тестирования секретов без внешних зависимостей.
-  - `external`: подключение к внешнему Vault с Kubernetes аутентификацией.
-- **External Secrets Operator (ESO)**: манифесты `SecretStore` и `ExternalSecret` для синхронизации секретов.
-- **RBAC**: генерация строгого `ServiceAccount` с `automountServiceAccountToken: false`, `Role` и `RoleBinding`.
+  - `in-cluster-dev`: автономный под Vault (режим dev) в кластере с преднастроенными health-пробами и hardened security context — идеален для локальной разработки без внешних зависимостей.
+  - `external`: интеграция с корпоративным HashiCorp Vault через Kubernetes ServiceAccount auth.
+- **External Secrets Operator (ESO)**:
+  - Ресурс `SecretStore` для безопасной связи с Vault.
+  - Ресурс `ExternalSecret` для декларативной материализации Kubernetes Secrets с интервалом обновления (например, `1h`).
+- **RBAC**:
+  - Создание изолированного `ServiceAccount` с `automountServiceAccountToken: false`.
+  - Минимально необходимые `Role` и `RoleBinding`.
+- **Trivy Scanner**:
+  - Автоматическое сканирование уязвимостей контейнеров и зависимостей по шкале HIGH/CRITICAL.
+
+---
 
 ## 4. Monitoring & Observability (`monitoring`)
-- **Prometheus Operator**: `ServiceMonitor` с 15-секундным сбором и пробросом метаданных пода и ноды.
-- **PrometheusRule**: алерты на p99 latency (> 1s), ошибки 5xx (> 5%), перегрузку подов по CPU (> 85%), частые рестарты подов.
-- **Grafana Dashboard**: `ConfigMap` с лейблом `grafana_dashboard: "1"` (Top подов по CPU/RAM, задержка запросов p50/p95/p99, сетевой трафик, RPS и ошибки).
-- **Kube-Prometheus-Stack**: готовый `values.yaml` для официального Helm-чарта.
+- **Prometheus Operator**:
+  - `ServiceMonitor` с 15-секундным сбором метрик (`/metrics`) и автоматическим пробросом меток пода (`pod`), ноды (`node`) и неймспейса (`namespace`).
+- **Глубокие алерты (`PrometheusRule`)**:
+  - Высокая задержка запросов (p99 latency > 1s).
+  - Уровень ошибок HTTP 5xx (> 5%).
+  - Перегрузка ноды/пода по CPU (> 85%) и памяти.
+  - Частые перезапуски подов (CrashLoopBackOff).
+- **Grafana Dashboard**:
+  - Автоматический `ConfigMap` с лейблом `grafana_dashboard: "1"` для автоматического подхвата sidecar'ом Grafana.
+  - Визуализация: распределение задержки p50/p95/p99, загрузка подов, сетевой трафик, RPS и HTTP-статусы.
+- **Kube-Prometheus-Stack**:
+  - Готовый файл `values.yaml` для официального чарта `prometheus-community/kube-prometheus-stack`.
+
+---
 
 ## 5. Storage & Backup (`storage`)
-- **MinIO (Dev)**: автономный pod MinIO с S3 API (порт 9000) и веб-консолью.
-- **S3 Провайдеры**: пресеты для Yandex Cloud Object Storage, VK Cloud, Selectel, AWS.
-- **Velero**: манифесты `BackupStorageLocation` и `Schedule` с настраиваемым cron-расписанием.
-- **Database Backup Workflows**: Kubernetes `CronJob` для безопасного дампирования PostgreSQL (`pg_dump`) или MySQL (`mysqldump`), компрессии и загрузки в S3.
+- **In-cluster MinIO (Dev)**:
+  - Автономный S3-совместимый под MinIO с веб-консолью для локального тестирования загрузки файлов и дампов.
+- **S3 Провайдеры**:
+  - **Yandex Cloud Object Storage** (`ru-central1`).
+  - **VK Cloud Storage** (`ru-msk`).
+  - **Selectel S3** (`ru-1`).
+  - **AWS S3** (`us-east-1` и любые регионы).
+- **Velero Backups**:
+  - Ресурсы `BackupStorageLocation` и `Schedule` для создания снимков неймспейсов по расписанию (например, ежедневно в 2:00) с автоматической политикой хранения (TTL 30 дней).
+- **Database Backup Workflows**:
+  - Kubernetes `CronJob` для безопасного дампирования PostgreSQL (`pg_dump`) или MySQL (`mysqldump`), архивации (`gzip`) и потоковой выгрузки в S3-бакет.
+
+---
 
 ## 6. CI/CD & Automation (`cicd`)
-- **GitHub Actions**: `.github/workflows/ci-cd.yml` с поддержкой cloud и self-hosted раннеров.
-- **GitLab CI**: `.gitlab-ci.yml`.
-- **GitOps**: `Application` для Argo CD (по умолчанию) или Flux CD.
-- **IaC**: базовые модули OpenTofu / Terraform.
-- **Ansible**: плейбук начальной настройки хостов и нод.
+- **Jenkins**:
+  - Декларативный `Jenkinsfile` со стадиями: Security Audit, Docker Build & Trivy Scan, Ephemeral Cluster Testing, GitOps Deploy.
+- **GitHub Actions**:
+  - Готовый пайплайн `.github/workflows/ci-cd.yml` с поддержкой cloud и self-hosted раннеров.
+- **GitLab CI**:
+  - `.gitlab-ci.yml` со стадиями validate, test, build, deploy.
+- **In-Cluster Runner**:
+  - Шаблон манифеста для развертывания CI-раннера внутри Kubernetes кластера.
+- **GitOps**:
+  - **Argo CD** (рекомендуемый дефолт): декларативный манифест `Application` с авто-синхронизацией (`automated.prune: true`, `selfHeal: true`).
+  - **Flux CD**: манифесты `GitRepository` и `Kustomization` / `HelmRelease`.
+- **Infrastructure as Code (IaC)**:
+  - Базовые манифесты OpenTofu / Terraform (`main.tf`) для провижининга инфраструктуры.
+- **Ansible**:
+  - Готовый плейбук `playbook.yml` и инвентарь `inventory.ini` для базовой настройки хостов.
