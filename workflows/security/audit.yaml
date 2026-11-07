@@ -1,0 +1,16 @@
+name: "Security & Compliance Audit"
+description: "Run Trivy container scan, K8s RBAC audit, and MoreOps security linter"
+version: "1.0"
+
+steps:
+  - id: linter
+    name: "Run MoreOps Security Rules (SEC001-SEC005)"
+    command: "moreops validate --security"
+
+  - id: container-scan
+    name: "Vulnerability Scan with Trivy"
+    command: "trivy fs --severity HIGH,CRITICAL . || true"
+
+  - id: rbac-audit
+    name: "Audit Kubernetes Least Privilege"
+    command: "moreops validate --rbac"

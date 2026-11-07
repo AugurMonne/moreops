@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${APP_NAME:-app}:dev
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    restart: unless-stopped
+    environment:
+      - PORT=${PORT:-8080}
+      - ENV=development
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "${PORT:-8080}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

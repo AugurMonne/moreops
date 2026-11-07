@@ -1,0 +1,29 @@
+name: "Application Deployment Workflow"
+description: "Standard pipeline for building, validating, testing, and releasing applications with MoreOps"
+version: "1.0"
+
+steps:
+  - id: validate
+    name: "Security & Configuration Validation"
+    command: "moreops validate --security"
+    continue_on_error: false
+
+  - id: plan
+    name: "Generate Infrastructure & Manifest Plan"
+    command: "moreops plan --output plan.diff"
+    continue_on_error: false
+
+  - id: test
+    name: "Ephemeral Integration Testing"
+    command: "moreops test --ephemeral"
+    continue_on_error: false
+
+  - id: apply
+    name: "Deploy / Sync Manifests"
+    command: "moreops apply --yes"
+    continue_on_error: false
+
+  - id: verify
+    name: "Post-deployment Health Check"
+    command: "moreops status"
+    continue_on_error: false

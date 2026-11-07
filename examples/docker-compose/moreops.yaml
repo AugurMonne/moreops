@@ -1,0 +1,26 @@
+version: "1.0"
+name: compose-stack
+description: Local multi-service stack with Docker Compose and MoreOps
+
+build:
+  language: go
+  port: 8080
+
+deploy:
+  type: raw
+  replicas: 1
+  resources:
+    cpu_limit: "1000m"
+    memory_limit: "1Gi"
+    cpu_request: "200m"
+    memory_request: "256Mi"
+
+monitoring:
+  enabled: true
+  path: /metrics
+  interval: 15s
+
+security:
+  run_as_non_root: true
+  read_only_root_filesystem: true
+  allow_privilege_escalation: false

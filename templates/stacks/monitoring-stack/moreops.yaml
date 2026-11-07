@@ -1,0 +1,21 @@
+version: "1"
+project:
+  name: cluster-observability
+  version: 1.0.0
+
+environments:
+  prod:
+    cluster: prod-k8s
+    namespace: monitoring
+
+modules:
+  monitoring:
+    enabled: true
+    prometheus: true
+    grafana: true
+    alertmanager: true
+    loki: true
+    opentelemetry: true
+    scrape_interval: 15s
+    dashboards: true
+    alert_rules: true

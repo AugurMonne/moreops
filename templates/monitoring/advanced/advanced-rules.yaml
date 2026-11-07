@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: advanced-slo-rules
+  labels:
+    role: alert-rules
+spec:
+  groups:
+    - name: slo-alerts
+      rules:
+        - alert: ServiceSlowP99Latency
+          expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, namespace, service)) > 1.5
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Service p99 latency exceeded 1.5s in {{ $labels.namespace }}/{{ $labels.service }}"

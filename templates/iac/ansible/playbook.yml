@@ -1,0 +1,9 @@
+---
+- name: Bootstrap Host
+  hosts: all
+  become: true
+  tasks:
+    - name: Install base tools
+      apt:
+        name: [curl, git, htop]
+        state: present

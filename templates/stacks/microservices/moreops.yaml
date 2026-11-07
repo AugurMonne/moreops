@@ -1,0 +1,48 @@
+version: "1"
+project:
+  name: microservices-core
+  version: 1.0.0
+
+environments:
+  prod:
+    cluster: k8s-production
+    namespace: core
+
+modules:
+  containers:
+    enabled: true
+  kubernetes:
+    enabled: true
+    tool: helm
+    replicas: 5
+    ingress: true
+  security:
+    enabled: true
+    vault:
+      enabled: true
+      mode: external
+    external_secrets:
+      enabled: true
+    rbac:
+      mode: strict
+  monitoring:
+    enabled: true
+    prometheus: true
+    grafana: true
+    alertmanager: true
+    dashboards: true
+  storage:
+    enabled: true
+    provider: yandex
+    bucket: prod-core-backups
+    velero:
+      enabled: true
+    database_backup:
+      enabled: true
+      engine: postgres
+  cicd:
+    enabled: true
+    provider: github
+    gitops:
+      enabled: true
+      tool: argocd

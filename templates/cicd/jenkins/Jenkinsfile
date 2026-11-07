@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME     = 'app'
+        MOREOPS_ENV  = 'dev'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build MoreOps CLI') {
+            steps {
+                sh 'make build'
+            }
+        }
+
+        stage('Validate & Lint') {
+            steps {
+                sh './bin/moreops validate'
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                sh './bin/moreops scan fs'
+            }
+        }
+
+        stage('Test & Verify') {
+            steps {
+                sh './bin/moreops test'
+            }
+        }
+
+        stage('Build Container') {
+            steps {
+                sh 'docker build -t ${APP_NAME}:${BUILD_NUMBER} .'
+            }
+        }
+
+        stage('MoreOps Plan') {
+            steps {
+                sh './bin/moreops plan --env ${MOREOPS_ENV}'
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh './bin/moreops apply --yes --env ${MOREOPS_ENV}'
+            }
+        }
+    }
+}

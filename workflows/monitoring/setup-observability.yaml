@@ -1,0 +1,20 @@
+name: "Setup Deep Observability"
+description: "Install and configure Prometheus, Grafana, ServiceMonitors, and AlertRules"
+version: "1.0"
+
+steps:
+  - id: crd-check
+    name: "Verify Prometheus Operator CRDs"
+    command: "kubectl get crd servicemonitors.monitoring.coreos.com prometheusrules.monitoring.coreos.com || true"
+
+  - id: generate-monitors
+    name: "Generate ServiceMonitor and Alert Rules"
+    command: "moreops generate --module monitoring"
+
+  - id: apply-dashboards
+    name: "Provision Grafana Observability Dashboard"
+    command: "kubectl apply -f templates/monitoring/dashboards/deep-observability.json -n monitoring || true"
+
+  - id: verify
+    name: "Verify Metrics Scraping"
+    command: "moreops monitor status"

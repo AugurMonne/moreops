@@ -1,0 +1,18 @@
+version: "1"
+project:
+  name: web-app
+  version: 0.1.0
+
+environments:
+  dev:
+    cluster: current-context
+    namespace: web-app-dev
+
+modules:
+  containers:
+    enabled: true
+    compose: true
+  kubernetes:
+    enabled: true
+    tool: helm
+    ingress: true

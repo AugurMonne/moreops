@@ -1,0 +1,30 @@
+version: "1.0"
+name: test-fixture-app
+description: Fixture application for automated tests
+
+build:
+  language: go
+  port: 8080
+
+deploy:
+  type: helm
+  replicas: 2
+  resources:
+    cpu_limit: "500m"
+    memory_limit: "512Mi"
+    cpu_request: "100m"
+    memory_request: "128Mi"
+  ingress:
+    enabled: true
+    host: fixture.test.local
+    path: /
+
+monitoring:
+  enabled: true
+  path: /metrics
+  interval: 15s
+
+security:
+  run_as_non_root: true
+  read_only_root_filesystem: true
+  allow_privilege_escalation: false

@@ -1,0 +1,29 @@
+stages:
+  - validate
+  - security
+  - test
+  - deploy
+
+default:
+  image: golang:1.22-alpine
+
+validate:
+  stage: validate
+  script:
+    - apk add --no-cache make git
+    - make build
+    - ./bin/moreops validate
+
+security:
+  stage: security
+  image: aquasec/trivy:latest
+  script:
+    - trivy fs --severity HIGH,CRITICAL .
+
+deploy:
+  stage: deploy
+  script:
+    - make build
+    - ./bin/moreops apply --yes
+  only:
+    - main

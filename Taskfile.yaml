@@ -1,0 +1,51 @@
+version: '3'
+
+vars:
+  BINARY_DIR: bin
+  BINARY_NAME: moreops
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build MoreOps binary
+    cmds:
+      - mkdir -p {{.BINARY_DIR}}
+      - go build -o {{.BINARY_DIR}}/{{.BINARY_NAME}} ./cmd/moreops
+    sources:
+      - '**/*.go'
+    generates:
+      - '{{.BINARY_DIR}}/{{.BINARY_NAME}}'
+
+  run:
+    desc: Run MoreOps from source
+    cmds:
+      - go run ./cmd/moreops {{.CLI_ARGS}}
+
+  test:
+    desc: Run all unit and integration tests
+    cmds:
+      - go test -v ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run
+
+  doctor:
+    desc: Run environment diagnostics
+    cmds:
+      - go run ./cmd/moreops doctor
+
+  clean:
+    desc: Clean build artifacts and cache
+    cmds:
+      - rm -rf {{.BINARY_DIR}} dist
+
+  release-dry-run:
+    desc: Test GoReleaser build without publishing
+    cmds:
+      - goreleaser release --snapshot --clean

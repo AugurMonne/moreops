@@ -1,0 +1,20 @@
+name: "Ephemeral Cluster & Infra Provisioning"
+description: "Provision k3d cluster with standard ingresses, monitoring stack, and vault"
+version: "1.0"
+
+steps:
+  - id: create-k3d
+    name: "Spin up Ephemeral k3d Cluster"
+    command: "k3d cluster create moreops-ephemeral --agents 2 --port 8080:80@loadbalancer --wait"
+
+  - id: install-crds
+    name: "Install Prometheus and External Secrets CRDs"
+    command: "helm repo add prometheus-community https://prometheus-community.github.io/helm-charts && helm repo add external-secrets https://charts.external-secrets.io && helm repo update"
+
+  - id: run-tests
+    name: "Run Integration Tests against Cluster"
+    command: "moreops test --cluster k3d-moreops-ephemeral"
+
+  - id: cleanup
+    name: "Teardown Ephemeral Cluster"
+    command: "k3d cluster delete moreops-ephemeral"

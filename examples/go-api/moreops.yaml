@@ -1,0 +1,25 @@
+version: "1"
+project:
+  name: go-api
+  version: 0.1.0
+  language: go
+
+environments:
+  dev:
+    cluster: current-context
+    namespace: go-api-dev
+
+modules:
+  containers:
+    enabled: true
+    compose: true
+  kubernetes:
+    enabled: true
+    tool: helm
+    port: 8080
+    replicas: 2
+    ingress: true
+  monitoring:
+    enabled: true
+    prometheus: true
+    grafana: true

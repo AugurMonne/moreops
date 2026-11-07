@@ -1,0 +1,20 @@
+name: "Disaster Recovery & Backup Workflow"
+description: "Schedule automated Velero backups and test snapshot restoration"
+version: "1.0"
+
+steps:
+  - id: check-storage
+    name: "Verify S3 / MinIO Connectivity"
+    command: "moreops storage check"
+
+  - id: create-backup-schedule
+    name: "Apply Velero BackupSchedule & Retention"
+    command: "kubectl apply -f templates/storage/backup/velero-schedule.yaml"
+
+  - id: trigger-manual-backup
+    name: "Execute Immediate Backup Snapshot"
+    command: "velero backup create manual-snapshot-$(date +%s) --include-namespaces default --wait || true"
+
+  - id: verify-backup
+    name: "Confirm Backup Status in S3"
+    command: "velero backup get"

@@ -1,0 +1,59 @@
+# MoreOps Default Configuration Template
+version: "1.0"
+project:
+  name: my-app
+  version: "0.1.0"
+  description: Modern cloud-native application managed by MoreOps
+
+environments:
+  dev:
+    cluster: k3d-dev
+    namespace: default
+  staging:
+    cluster: k8s-staging
+    namespace: staging
+  prod:
+    cluster: k8s-prod
+    namespace: production
+
+modules:
+  containers:
+    enabled: true
+    engine: docker
+    compose: true
+
+  kubernetes:
+    enabled: true
+    tool: helm
+    replicas: 2
+    ingress: true
+
+  monitoring:
+    enabled: true
+    prometheus: true
+    grafana: true
+    scrape_interval: 15s
+    dashboards: true
+    alert_rules: true
+
+  security:
+    enabled: true
+    vault:
+      enabled: true
+      mode: in-cluster-dev
+    external_secrets:
+      enabled: true
+
+  storage:
+    enabled: true
+    provider: minio-dev
+    velero:
+      enabled: true
+      schedule: "0 2 * * *"
+
+  cicd:
+    enabled: true
+    provider: jenkins
+    gitops:
+      enabled: true
+      tool: argocd

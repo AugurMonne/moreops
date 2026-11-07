@@ -1,0 +1,19 @@
+version: "1.0"
+project:
+  name: testdata-service
+  version: "0.1.0"
+  description: Service used for test fixtures
+  language: go
+environments:
+  dev:
+    cluster: k3d-dev
+    namespace: dev
+modules:
+  containers:
+    enabled: true
+    engine: docker
+  kubernetes:
+    enabled: true
+    tool: helm
+    replicas: 1
+    port: 8080

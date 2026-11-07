@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Name }}-db-backup
+  namespace: {{ .Namespace }}
+spec:
+  schedule: "{{ .Schedule }}"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: db-backup
+              image: postgres:16-alpine
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  echo "Starting database backup for $DB_NAME..."
+                  pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME | gzip > /tmp/backup.sql.gz
+                  echo "Uploading to S3..."

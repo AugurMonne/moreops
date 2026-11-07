@@ -1,0 +1,32 @@
+version: "1.0"
+name: node-api
+description: Node.js Express REST API example managed by MoreOps
+
+build:
+  language: nodejs
+  version: "20"
+  port: 3000
+  dockerfile: Dockerfile
+
+deploy:
+  type: helm
+  replicas: 2
+  resources:
+    cpu_limit: "500m"
+    memory_limit: "512Mi"
+    cpu_request: "100m"
+    memory_request: "128Mi"
+  ingress:
+    enabled: true
+    host: node-api.local
+    path: /
+
+monitoring:
+  enabled: true
+  path: /metrics
+  interval: 15s
+
+security:
+  run_as_non_root: true
+  read_only_root_filesystem: true
+  allow_privilege_escalation: false

@@ -1,0 +1,32 @@
+version: "1"
+project:
+  name: api-service
+  version: 1.0.0
+
+environments:
+  dev:
+    cluster: current-context
+    namespace: api-dev
+  prod:
+    cluster: prod-k8s
+    namespace: api-prod
+
+modules:
+  containers:
+    enabled: true
+  kubernetes:
+    enabled: true
+    tool: helm
+    replicas: 3
+    ingress: true
+  security:
+    enabled: true
+    vault:
+      enabled: true
+      mode: in-cluster-dev
+    rbac:
+      mode: strict
+  monitoring:
+    enabled: true
+    prometheus: true
+    grafana: true

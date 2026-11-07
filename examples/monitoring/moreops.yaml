@@ -1,0 +1,28 @@
+version: "1.0"
+name: deep-monitoring-app
+description: Application configured with Prometheus Operator ServiceMonitor and Alert Rules
+
+build:
+  language: go
+  port: 8080
+
+deploy:
+  type: helm
+  replicas: 2
+  resources:
+    cpu_limit: "500m"
+    memory_limit: "512Mi"
+    cpu_request: "100m"
+    memory_request: "128Mi"
+
+monitoring:
+  enabled: true
+  path: /metrics
+  interval: 15s
+  alerts_enabled: true
+  grafana_dashboard: "1"
+
+security:
+  run_as_non_root: true
+  read_only_root_filesystem: true
+  allow_privilege_escalation: false

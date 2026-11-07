@@ -1,0 +1,53 @@
+version: "1"
+project:
+  name: enterprise-prod
+  version: 1.0.0
+
+environments:
+  prod:
+    cluster: k8s-main-cluster
+    namespace: production
+    cloud: yandex
+
+modules:
+  containers:
+    enabled: true
+    engine: docker
+  kubernetes:
+    enabled: true
+    tool: helm
+    replicas: 4
+    ingress: true
+  security:
+    enabled: true
+    vault:
+      enabled: true
+      mode: external
+    external_secrets:
+      enabled: true
+    rbac:
+      mode: strict
+  monitoring:
+    enabled: true
+    prometheus: true
+    grafana: true
+    alertmanager: true
+    dashboards: true
+    alert_rules: true
+  storage:
+    enabled: true
+    provider: yandex
+    bucket: enterprise-backups
+    velero:
+      enabled: true
+      schedule: "0 2 * * *"
+    database_backup:
+      enabled: true
+      engine: postgres
+      schedule: "0 3 * * *"
+  cicd:
+    enabled: true
+    provider: gitlab
+    gitops:
+      enabled: true
+      tool: argocd

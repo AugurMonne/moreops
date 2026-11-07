@@ -1,0 +1,26 @@
+version: "1.0"
+name: secure-vault-app
+description: Zero-trust application consuming secrets via External Secrets Operator and Vault
+
+build:
+  language: go
+  port: 8080
+
+deploy:
+  type: helm
+  replicas: 2
+  resources:
+    cpu_limit: "500m"
+    memory_limit: "512Mi"
+    cpu_request: "100m"
+    memory_request: "128Mi"
+
+security:
+  run_as_non_root: true
+  read_only_root_filesystem: true
+  allow_privilege_escalation: false
+  vault_enabled: true
+  vault_provider: in-cluster-dev
+  vault_address: http://vault.vault.svc.cluster.local:8200
+  vault_role: secure-vault-app
+  secret_path: secret/data/secure-vault-app

@@ -1,0 +1,12 @@
+.git
+.gitignore
+.github
+.task
+.moreops
+bin/
+dist/
+tmp/
+*.log
+docs/
+.env*
+.DS_Store
