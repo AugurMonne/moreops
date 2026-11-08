@@ -219,12 +219,35 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 			k8sTool = "helm"
 		}
 
+		replicasStr := w.Ask(reader, "Initial replicas count", "2")
+		replicas := 2
+		if r, err := strconv.Atoi(strings.TrimSpace(replicasStr)); err == nil && r > 0 {
+			replicas = r
+		}
+
+		hpaChoice := w.Ask(reader, "Enable Horizontal Pod Autoscaling (HPA)? (yes/no)", "yes")
+		enableHPA := strings.ToLower(strings.TrimSpace(hpaChoice)) == "yes" || strings.ToLower(strings.TrimSpace(hpaChoice)) == "y"
+		minReplicas := replicas
+		maxReplicas := 10
+		if enableHPA {
+			maxRepStr := w.Ask(reader, "HPA maximum replicas", "10")
+			if m, err := strconv.Atoi(strings.TrimSpace(maxRepStr)); err == nil && m >= minReplicas {
+				maxReplicas = m
+			}
+		}
+
 		cfg.Modules.Kubernetes = &config.KubernetesModuleConfig{
 			Enabled:  true,
 			Tool:     k8sTool,
 			Port:     defaultPort,
-			Replicas: 2,
+			Replicas: replicas,
 			Ingress:  true,
+			Autoscaling: &config.AutoscalingConfig{
+				Enabled:       enableHPA,
+				MinReplicas:   minReplicas,
+				MaxReplicas:   maxReplicas,
+				CPUPercentage: 80,
+			},
 		}
 	}
 

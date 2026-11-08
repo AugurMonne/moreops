@@ -1,16 +1,16 @@
-# Configuration Reference
+# Справочник конфигурации MoreOps
 
-MoreOps reads its declarative configuration from `moreops.yaml`.
+Декларативное описание проекта хранится в файле `moreops.yaml`.
 
-## Top-Level Fields
+## Основные секции
 
-- `version`: Configuration schema version (e.g. `"1.0"`)
-- `project`: Metadata including name, version, description, language, and framework
-- `environments`: Target environment mappings (`dev`, `staging`, `prod`) with cluster, namespace, and cloud overrides
-- `modules`: Selectable module settings:
-  - `containers`: Docker, containerd, docker-compose
-  - `kubernetes`: Helm chart, Kustomize, Raw manifests
-  - `monitoring`: Prometheus, Grafana, ServiceMonitor, deep dashboards
-  - `security`: Vault, External Secrets Operator, RBAC, Trivy
-  - `storage`: S3/MinIO, Velero backups, Database CronJobs
-  - `cicd`: Jenkins, GitHub Actions, GitLab CI, Argo CD, OpenTofu, Ansible
+- `version`: Версия схемы конфигурации (например, `"1"`).
+- `project`: Метаданные сервиса (имя, версия, описание, язык программирования, фреймворк).
+- `environments`: Карта целевых окружений (`dev`, `staging`, `prod`) с привязкой к Kubernetes-контекстам/кластерам, неймспейсам и облакам.
+- `modules`: Настройки независимых модулей:
+  - `containers`: Docker, containerd, docker-compose.
+  - `kubernetes`: Стратегия деплоя (Helm-чарт, Kustomize, Raw манифесты), порт, реплики, HPA автоскейлинг.
+  - `monitoring`: Prometheus Operator `ServiceMonitor`, пороги алертов, Grafana дашборды.
+  - `security`: HashiCorp Vault (in-cluster dev или external), External Secrets Operator, RBAC, Trivy.
+  - `storage`: S3/MinIO, расписание снимков Velero, бэкапы баз данных.
+  - `cicd`: Jenkins (`Jenkinsfile`), GitHub Actions, GitLab CI, Argo CD, OpenTofu, Ansible.

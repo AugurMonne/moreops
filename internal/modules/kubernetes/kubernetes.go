@@ -58,9 +58,26 @@ func (m *Module) Plan(ctx context.Context, cfg *config.Config, envName string) (
 		Summary:     fmt.Sprintf("Kubernetes %s configuration for %s", k8sCfg.Tool, appName),
 	}
 
+	hpaEnabled := true
+	minReplicas := replicas
+	maxReplicas := 10
+	cpuTarget := 80
+	if k8sCfg.Autoscaling != nil {
+		hpaEnabled = k8sCfg.Autoscaling.Enabled
+		if k8sCfg.Autoscaling.MinReplicas > 0 {
+			minReplicas = k8sCfg.Autoscaling.MinReplicas
+		}
+		if k8sCfg.Autoscaling.MaxReplicas > 0 {
+			maxReplicas = k8sCfg.Autoscaling.MaxReplicas
+		}
+		if k8sCfg.Autoscaling.CPUPercentage > 0 {
+			cpuTarget = k8sCfg.Autoscaling.CPUPercentage
+		}
+	}
+
 	switch k8sCfg.Tool {
 	case "helm":
-		changes, err := generateHelmChart(appName, namespace, image, port, replicas, k8sCfg.Ingress)
+		changes, err := generateHelmChart(appName, namespace, image, port, replicas, k8sCfg.Ingress, hpaEnabled, minReplicas, maxReplicas, cpuTarget)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +107,7 @@ func (m *Module) Apply(ctx context.Context, plan *plugin.PlanResult) error {
 
 // ---------------- Helm Chart Generation ----------------
 
-func generateHelmChart(appName, namespace, image string, port, replicas int, ingress bool) ([]diff.FileChange, error) {
+func generateHelmChart(appName, namespace, image string, port, replicas int, ingress bool, hpaEnabled bool, minReplicas, maxReplicas, cpuTarget int) ([]diff.FileChange, error) {
 	chartDir := filepath.Join("charts", appName)
 	templatesDir := filepath.Join(chartDir, "templates")
 
@@ -147,11 +164,11 @@ podSecurityContext:
     type: RuntimeDefault
 
 autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 80
-`, replicas, image, port, ingress, appName),
+  enabled: %t
+  minReplicas: %d
+  maxReplicas: %d
+  targetCPUUtilizationPercentage: %d
+`, replicas, image, port, ingress, appName, hpaEnabled, minReplicas, maxReplicas, cpuTarget),
 
 		filepath.Join(chartDir, "values-dev.yaml"): fmt.Sprintf(`replicaCount: 1
 resources:

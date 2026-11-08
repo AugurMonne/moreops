@@ -40,7 +40,10 @@ func TestWizardRunDefaults(t *testing.T) {
 	// 5. Namespace -> Enter (default: default)
 	// 6. Selection -> Enter (default: 1 2)
 	// 7. Kubernetes strategy -> Enter (default: helm)
-	simulatedInput := "\n\n\n\n\n\n\n"
+	// 8. Replicas count -> Enter (default: 2)
+	// 9. Enable HPA -> Enter (default: yes)
+	// 10. Max replicas -> Enter (default: 10)
+	simulatedInput := "\n\n\n\n\n\n\n\n\n\n"
 	in := strings.NewReader(simulatedInput)
 	out := &bytes.Buffer{}
 

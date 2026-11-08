@@ -1,3 +1,14 @@
-# Contributing to MoreOps
+# Руководство по внесению вклада (Contributing)
 
-We welcome contributions! Please review [CONTRIBUTING.md](../../CONTRIBUTING.md) in the project root for development setup, testing guidelines, and code of conduct.
+Мы рады вашему вкладу в развитие MoreOps!
+
+Перед отправкой изменений:
+1. Ознакомьтесь с [CONTRIBUTING.md](../../CONTRIBUTING.md) в корне проекта.
+2. Убедитесь, что все тесты успешно проходят:
+   ```bash
+   go test -v ./...
+   ```
+3. Проверьте форматирование и сборку:
+   ```bash
+   make build
+   ```

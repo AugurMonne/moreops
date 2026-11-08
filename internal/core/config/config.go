@@ -57,12 +57,21 @@ type ContainersModuleConfig struct {
 
 // KubernetesModuleConfig configures Kubernetes workload deployment.
 type KubernetesModuleConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	Tool      string `yaml:"tool,omitempty"` // manifests, helm, kustomize
-	Port      int    `yaml:"port,omitempty"`
-	Replicas  int    `yaml:"replicas,omitempty"`
-	Ingress   bool   `yaml:"ingress,omitempty"`
-	ConfigMap bool   `yaml:"configmap,omitempty"`
+	Enabled     bool               `yaml:"enabled"`
+	Tool        string             `yaml:"tool,omitempty"` // manifests, helm, kustomize
+	Port        int                `yaml:"port,omitempty"`
+	Replicas    int                `yaml:"replicas,omitempty"`
+	Ingress     bool               `yaml:"ingress,omitempty"`
+	ConfigMap   bool               `yaml:"configmap,omitempty"`
+	Autoscaling *AutoscalingConfig `yaml:"autoscaling,omitempty"`
+}
+
+// AutoscalingConfig defines Horizontal Pod Autoscaler policies.
+type AutoscalingConfig struct {
+	Enabled       bool `yaml:"enabled"`
+	MinReplicas   int  `yaml:"min_replicas,omitempty"`
+	MaxReplicas   int  `yaml:"max_replicas,omitempty"`
+	CPUPercentage int  `yaml:"cpu_percentage,omitempty"`
 }
 
 // MonitoringModuleConfig configures Prometheus, Grafana, Loki, Alertmanager, etc.

@@ -1,9 +1,9 @@
-# Workflows
+# Воркфлоу MoreOps (Workflows)
 
-MoreOps comes with preconfigured operational workflows in the `workflows/` directory:
+В каталоге `workflows/` содержатся готовые сценарии автоматизации для платформы:
 
-- `workflows/application/deploy.yaml`: Complete build, validate, ephemeral test, and GitOps deploy flow.
-- `workflows/monitoring/setup-observability.yaml`: Deploy Prometheus ServiceMonitors, alerts, and Grafana dashboards.
-- `workflows/backup/disaster-recovery.yaml`: Backup scheduling and automated Velero snapshots to S3.
-- `workflows/security/audit.yaml`: Trivy vulnerability scans and Kubernetes RBAC audits.
-- `workflows/infrastructure/cluster-provision.yaml`: Spin up and tear down ephemeral `k3d` test clusters.
+- `workflows/application/deploy.yaml`: Полный цикл сборки, статического аудита, эфемерного тестирования и релиза через GitOps.
+- `workflows/monitoring/setup-observability.yaml`: Развертывание ServiceMonitor, AlertRules и дашбордов Grafana.
+- `workflows/backup/disaster-recovery.yaml`: Настройка расписаний создания снимков Velero и потоковой выгрузки дампов баз данных в S3.
+- `workflows/security/audit.yaml`: Сканирование уязвимостей через Trivy и проверка прав доступа RBAC.
+- `workflows/infrastructure/cluster-provision.yaml`: Поднятие и удаление эфемерных `k3d` кластеров для тестирования.
