@@ -8,7 +8,7 @@ COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /bin/app ./cmd/...
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o /bin/app ./cmd/...
 
 # Minimal distroless runtime
 FROM gcr.io/distroless/static-debian12:nonroot

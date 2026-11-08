@@ -5,7 +5,7 @@ BINARY=bin/$(APP)
 
 build:
 	mkdir -p bin
-	go build -o $(BINARY) ./cmd/moreops
+	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o $(BINARY) ./cmd/moreops
 
 run:
 	go run ./cmd/moreops
