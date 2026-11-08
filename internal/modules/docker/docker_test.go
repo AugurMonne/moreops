@@ -143,3 +143,76 @@ func TestDockerPlanWithDatabaseAndRabbitMQ(t *testing.T) {
 		t.Error("expected service_healthy check in docker-compose.yml")
 	}
 }
+
+func TestDockerPlanKeepExistingAndCustomPath(t *testing.T) {
+	m := &Module{}
+	// Scenario A: Keep existing Dockerfile
+	cfgKeep := &config.Config{
+		Project: config.ProjectMeta{
+			Name:     "existing-app",
+			Language: "go",
+		},
+		Modules: config.ModulesConfig{
+			Containers: &config.ContainersModuleConfig{
+				Enabled:      true,
+				Engine:       "docker",
+				Dockerfile:   "Dockerfile",
+				KeepExisting: true,
+				Compose:      true,
+			},
+		},
+	}
+
+	planKeep, err := m.Plan(context.Background(), cfgKeep, "dev")
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
+
+	for _, fc := range planKeep.FileChanges {
+		if fc.Path == "Dockerfile" {
+			t.Error("expected Dockerfile NOT to be modified when KeepExisting is true")
+		}
+	}
+
+	// Scenario B: Custom Dockerfile path and context in monorepo
+	cfgCustom := &config.Config{
+		Project: config.ProjectMeta{
+			Name:     "monorepo-srv",
+			Language: "go",
+		},
+		Modules: config.ModulesConfig{
+			Containers: &config.ContainersModuleConfig{
+				Enabled:    true,
+				Engine:     "docker",
+				Dockerfile: "services/api/Dockerfile",
+				Context:    "services/api",
+				Compose:    true,
+			},
+		},
+	}
+
+	planCustom, err := m.Plan(context.Background(), cfgCustom, "dev")
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
+
+	var foundCustomDockerfile, foundComposeCustom bool
+	for _, fc := range planCustom.FileChanges {
+		if fc.Path == "services/api/Dockerfile" {
+			foundCustomDockerfile = true
+		}
+		if fc.Path == "docker-compose.yml" {
+			foundComposeCustom = true
+			if !strings.Contains(fc.NewData, "context: services/api") || !strings.Contains(fc.NewData, "dockerfile: services/api/Dockerfile") {
+				t.Errorf("expected custom context and dockerfile in compose: %s", fc.NewData)
+			}
+		}
+	}
+
+	if !foundCustomDockerfile {
+		t.Error("expected services/api/Dockerfile in plan")
+	}
+	if !foundComposeCustom {
+		t.Error("expected docker-compose.yml in plan")
+	}
+}

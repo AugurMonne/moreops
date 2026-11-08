@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
@@ -175,10 +176,20 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 	version := w.Ask(reader, "Project version", "0.1.0")
 
 	// Step 2: Environments
-	w.printStep(2, 4, "Target Environment")
-	envName := w.Ask(reader, "Default environment name", "dev")
-	cluster := w.Ask(reader, "Kubernetes context/cluster", "current-context")
-	namespace := w.Ask(reader, "Kubernetes namespace", "default")
+	w.printStep(2, 4, "Target Environments")
+	envChoices := []Choice{
+		{ID: 1, Key: "dev", Label: "dev (Development)", Description: "1 replica, minimal resources, debug logging, local ingress"},
+		{ID: 2, Key: "staging", Label: "staging (Pre-production)", Description: "2 replicas, staging database & staging ingress"},
+		{ID: 3, Key: "prod", Label: "prod (Production)", Description: "3+ replicas, strict security, autoscaling (HPA), PDB, TLS"},
+	}
+
+	selectedEnvs, _ := SelectMulti(reader, w.in, w.out, "Select deployment environments", envChoices, []int{0, 2})
+	if len(selectedEnvs) == 0 {
+		selectedEnvs = append(selectedEnvs, envChoices[0], envChoices[2])
+	}
+
+	cluster := w.Ask(reader, "Primary Kubernetes cluster/context", "current-context")
+	namespace := w.Ask(reader, "Base Kubernetes namespace", "default")
 
 	// Step 3: Components multi-select
 	w.printStep(3, 4, "Select Architecture Modules")
@@ -212,14 +223,46 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 			Name:    name,
 			Version: version,
 		},
-		Environments: map[string]config.EnvironmentConfig{
-			envName: {
-				Cluster:   cluster,
-				Namespace: namespace,
-				Cloud:     "local",
-			},
-		},
-		Modules: config.ModulesConfig{},
+		Environments: make(map[string]config.EnvironmentConfig),
+		Modules:      config.ModulesConfig{},
+	}
+
+	for _, envChoice := range selectedEnvs {
+		envKey := envChoice.Key
+		envCluster := cluster
+		envNs := namespace
+		cloud := "cloud"
+		if envKey == "dev" {
+			cloud = "local"
+			if namespace == "default" {
+				envNs = "default"
+			} else {
+				envNs = namespace
+			}
+		} else if envKey == "staging" {
+			if cluster == "current-context" {
+				envCluster = "staging-cluster"
+			}
+			if namespace == "default" {
+				envNs = name + "-staging"
+			} else {
+				envNs = namespace + "-staging"
+			}
+		} else if envKey == "prod" {
+			if cluster == "current-context" {
+				envCluster = "prod-cluster"
+			}
+			if namespace == "default" {
+				envNs = name + "-prod"
+			} else {
+				envNs = namespace
+			}
+		}
+		cfg.Environments[envKey] = config.EnvironmentConfig{
+			Cluster:   envCluster,
+			Namespace: envNs,
+			Cloud:     cloud,
+		}
 	}
 
 	if info != nil {
@@ -234,11 +277,52 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 
 	// Module 1: Containers
 	if selectedSet[1] {
+		dockerfilePath := "Dockerfile"
+		contextPath := "."
+		keepExisting := false
+
+		checkDir := projectDir
+		if checkDir == "" {
+			checkDir = "."
+		}
+		existingDockerfile := filepath.Join(checkDir, "Dockerfile")
+
+		if _, err := os.Stat(existingDockerfile); err == nil {
+			dockerOptions := []Choice{
+				{ID: 1, Key: "keep", Label: "Keep existing Dockerfile (Recommended)", Description: "Preserve current Dockerfile and don't overwrite it"},
+				{ID: 2, Key: "overwrite", Label: "Overwrite with MoreOps hardened Dockerfile", Description: "Replace with multi-stage distroless/non-root Dockerfile"},
+				{ID: 3, Key: "custom", Label: "Generate to custom path (e.g. Dockerfile.moreops)", Description: "Keep existing Dockerfile and output new one elsewhere"},
+			}
+			chosenDocker, _ := SelectOne(reader, w.in, w.out, "Existing Dockerfile found in project root:", dockerOptions, 0)
+			switch chosenDocker.Key {
+			case "keep":
+				keepExisting = true
+				dockerfilePath = "Dockerfile"
+			case "custom":
+				dockerfilePath = w.Ask(reader, "Target Dockerfile path", "Dockerfile.moreops")
+				contextPath = w.Ask(reader, "Docker build context", ".")
+			default:
+				keepExisting = false
+				dockerfilePath = "Dockerfile"
+			}
+		} else {
+			customPath := w.Ask(reader, "Dockerfile path", "Dockerfile")
+			if customPath != "" {
+				dockerfilePath = customPath
+			}
+			if filepath.Dir(dockerfilePath) != "." && filepath.Dir(dockerfilePath) != "/" && filepath.Dir(dockerfilePath) != "" {
+				contextPath = w.Ask(reader, "Docker build context", ".")
+			}
+		}
+
 		cfg.Modules.Containers = &config.ContainersModuleConfig{
-			Enabled: true,
-			Engine:  "docker",
-			Image:   name + ":latest",
-			Compose: true,
+			Enabled:      true,
+			Engine:       "docker",
+			Dockerfile:   dockerfilePath,
+			Context:      contextPath,
+			KeepExisting: keepExisting,
+			Image:        name + ":latest",
+			Compose:      true,
 		}
 	}
 
@@ -604,7 +688,15 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 	fmt.Fprintln(w.out, ansiGreen+ansiBold+"│                ✨ Configuration Summary                  │"+ansiReset)
 	fmt.Fprintln(w.out, ansiGreen+ansiBold+"├──────────────────────────────────────────────────────────┤"+ansiReset)
 	fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Project:", name+" (v"+version+")")
-	fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Environment:", envName+" (ns: "+namespace+")")
+	var envNames []string
+	for k := range cfg.Environments {
+		envNames = append(envNames, k)
+	}
+	envSummary := strings.Join(envNames, ", ")
+	if len(envSummary) > 38 {
+		envSummary = envSummary[:38]
+	}
+	fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Environments:", envSummary)
 	if cfg.Modules.Kubernetes != nil && cfg.Modules.Kubernetes.Enabled {
 		strategy := cfg.Modules.Kubernetes.Tool
 		if cfg.Modules.Kubernetes.Autoscaling != nil && cfg.Modules.Kubernetes.Autoscaling.Enabled {

@@ -127,11 +127,23 @@ CMD ["sh"]
 `, port)
 	}
 
-	fcDoc, err := diff.ComputeFileChange("Dockerfile", dockerfileContent)
-	if err != nil {
-		return nil, err
+	dockerfilePath := "Dockerfile"
+	if cfg.Modules.Containers.Dockerfile != "" {
+		dockerfilePath = cfg.Modules.Containers.Dockerfile
 	}
-	res.FileChanges = append(res.FileChanges, fcDoc)
+	contextPath := "."
+	if cfg.Modules.Containers.Context != "" {
+		contextPath = cfg.Modules.Containers.Context
+	}
+
+	// 1. Generate Multi-Stage Hardened Dockerfile (unless configured to keep existing)
+	if !cfg.Modules.Containers.KeepExisting {
+		fcDoc, err := diff.ComputeFileChange(dockerfilePath, dockerfileContent)
+		if err != nil {
+			return nil, err
+		}
+		res.FileChanges = append(res.FileChanges, fcDoc)
+	}
 
 	// 2. Generate .dockerignore
 	dockerignoreContent := `.git
@@ -262,8 +274,8 @@ vendor
 services:
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: %s
+      dockerfile: %s
     image: %s:dev
     ports:
       - "%d:%d"
@@ -276,7 +288,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-%s%s`, cfg.Project.Name, port, port, port, extraEnv.String(), dependsOn.String(), port, extraServices.String(), volumes.String())
+%s%s`, contextPath, dockerfilePath, cfg.Project.Name, port, port, port, extraEnv.String(), dependsOn.String(), port, extraServices.String(), volumes.String())
 
 		composeContent := template.Resolve("docker/compose", defaultCompose)
 

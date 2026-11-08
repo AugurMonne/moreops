@@ -7,16 +7,22 @@ Every module in MoreOps operates independently and can be toggled in the `module
 ## 1. Containers (`containers`)
 - **Hardened Multi-stage Dockerfile**: Minimalist image generation using distroless or alpine runtimes tailored to your language (Go, Node.js, Python, Java, Rust, .NET).
 - **UID/GID 65532 / 10001 (Non-root)**: Containers never run as root.
-- **Docker Compose**: Complete local development stack (`docker-compose.yml`) with automated health checks.
+- **Custom Dockerfile Paths**: Full support for custom Dockerfile locations (`dockerfile: "services/api/Dockerfile"`, `context: "services/api"`), ideal for monorepos and multi-service repositories.
+- **Preserve Existing Dockerfiles**: Option `keep_existing: true` keeps your current Dockerfile intact, generating only `.dockerignore` and configured `docker-compose.yml`.
+- **Docker Compose**: Complete local development stack (`docker-compose.yml`) with automated health checks, database, and RabbitMQ.
 - **`.dockerignore`**: Automatically prevents compilation artifacts, git history, and `.env*` files from entering builds.
 
 ---
 
 ## 2. Kubernetes (`kubernetes`)
 - **Helm Chart (Default & Recommended)**:
-  - Chart structure in `charts/<app>/` (Chart.yaml, values.yaml, templates/).
-  - Workload manifests: Deployment (replicas omitted when HPA is enabled to prevent GitOps flapping), Service, Ingress, HPA, NetworkPolicy.
-  - Environment values: `values-dev.yaml`, `values-prod.yaml`.
+  - Chart structure in `charts/<app>/` (Chart.yaml, values.yaml, values.schema.json, templates/).
+  - Workload manifests: Deployment, Service, Ingress, HPA, PodDisruptionBudget, NetworkPolicy.
+  - Multi-Environment Values Overlays:
+    - **`dev`**: 1 replica, lightweight resources (50m/200m CPU, 64Mi/256Mi RAM), HPA disabled, Ingress `dev.<app>.local`, `LOG_LEVEL=debug`.
+    - **`staging`**: 2 replicas, pre-production resources (100m/500m CPU, 128Mi/512Mi RAM), HPA 2-5 replicas, Ingress `staging.<app>.internal`, `LOG_LEVEL=info`.
+    - **`prod`**: 3+ replicas, production limits (200m/1000m CPU, 256Mi/1Gi RAM), HPA 3-20 replicas, PodDisruptionBudget (`minAvailable: 1`), production TLS Ingress with cert-manager, `LOG_LEVEL=warn`.
+  - JSON Schema validation (`values.schema.json`) for IDE auto-completion and `helm lint`.
 - **Supported Ingress Controllers (What you choose & What you get)**:
   - `nginx` (**NGINX Ingress**, Default): `className: "nginx"`, auto-configured with SSL redirect annotations (`nginx.ingress.kubernetes.io/ssl-redirect: "true"`).
   - `traefik` (**Traefik Ingress**): `className: "traefik"`, auto-configured with Traefik router entrypoints (`traefik.ingress.kubernetes.io/router.entrypoints: web,websecure`, `traefik.ingress.kubernetes.io/router.tls: "true"`).
@@ -25,7 +31,7 @@ Every module in MoreOps operates independently and can be toggled in the `module
   - `custom`: User-specified `ingressClassName` and custom annotations.
 - **Kustomize**:
   - Base manifests in `k8s/base/` with `kustomization.yaml`.
-  - Overlays in `k8s/overlays/dev/` and `k8s/overlays/prod/`.
+  - Overlays in `k8s/overlays/dev/`, `k8s/overlays/staging/`, and `k8s/overlays/prod/`.
 - **Raw Manifests**:
   - Direct Kubernetes manifests in `k8s/` configured with the selected Ingress controller.
 

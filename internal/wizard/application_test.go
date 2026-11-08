@@ -77,8 +77,8 @@ func TestWizardRunDefaults(t *testing.T) {
 }
 
 func TestWizardRunCustomSelection(t *testing.T) {
-	// Enter project name "custom-srv", version "2.0.0", env "prod", cluster "k8s-prod", ns "apps", selection "14", vault -> enter, rbac -> enter, db -> enter, rabbitmq -> enter
-	simulatedInput := "custom-srv\n2.0.0\nprod\nk8s-prod\napps\n14\n\n\n\n\n"
+	// Enter project name "custom-srv", version "2.0.0", envs "3" (prod), cluster "k8s-prod", ns "apps", selection "14", dockerfile -> enter (keep), vault -> enter, rbac -> enter, db -> enter, rabbitmq -> enter
+	simulatedInput := "custom-srv\n2.0.0\n3\nk8s-prod\napps\n14\n\n\n\n\n\n"
 	in := strings.NewReader(simulatedInput)
 	out := &bytes.Buffer{}
 
@@ -111,11 +111,11 @@ func TestWizardRunCustomSelection(t *testing.T) {
 }
 
 func TestWizardRunDatabaseAndRabbitMQ(t *testing.T) {
-	// project "db-app", version "1.0.0", env "dev", cluster, ns, selection "12"
-	// k8s -> enter (helm), replicas -> enter (2), hpa -> enter, max -> enter, ingress -> enter (nginx)
+	// project "db-app", version "1.0.0", envs -> enter (dev & prod), cluster "k8s-dev", ns "apps", selection "12"
+	// dockerfile -> enter (keep), k8s -> enter (helm), replicas -> enter (2), hpa -> enter, max -> enter, ingress -> enter (nginx)
 	// db: "2" (postgres), topology: "1" (shared), migration: "yes"
-	// rabbitmq: "yes"
-	simulatedInput := "db-app\n1.0.0\ndev\nk8s-dev\napps\n12\n\n\n\n\n\n2\n1\nyes\nyes\n"
+	// rabbitmq: "2" (yes)
+	simulatedInput := "db-app\n1.0.0\n\nk8s-dev\napps\n12\n\n\n\n\n\n\n2\n1\nyes\n2\n"
 	in := strings.NewReader(simulatedInput)
 	out := &bytes.Buffer{}
 
@@ -147,10 +147,10 @@ func TestWizardRunDatabaseAndRabbitMQ(t *testing.T) {
 }
 
 func TestWizardRunTraefikIngress(t *testing.T) {
-	// project "traefik-app", version "1.0.0", env "dev", cluster, ns, selection "12"
-	// k8s -> enter (helm), replicas -> enter (2), hpa -> enter, max -> enter, ingress: "2" (traefik)
+	// project "traefik-app", version "1.0.0", envs -> enter (dev & prod), cluster "k8s-dev", ns "apps", selection "12"
+	// dockerfile -> enter (keep), k8s -> enter (helm), replicas -> enter (2), hpa -> enter, max -> enter, ingress: "2" (traefik)
 	// db -> enter (none), rabbitmq -> enter (no)
-	simulatedInput := "traefik-app\n1.0.0\ndev\nk8s-dev\napps\n12\n\n\n\n\n2\n\n\n"
+	simulatedInput := "traefik-app\n1.0.0\n\nk8s-dev\napps\n12\n\n\n\n\n\n2\n\n\n"
 	in := strings.NewReader(simulatedInput)
 	out := &bytes.Buffer{}
 

@@ -71,11 +71,13 @@ type MessagingModuleConfig struct {
 
 // ContainersModuleConfig configures container runtime and build setup.
 type ContainersModuleConfig struct {
-	Enabled    bool   `yaml:"enabled"`
-	Engine     string `yaml:"engine,omitempty"` // docker, containerd, podman
-	Dockerfile string `yaml:"dockerfile,omitempty"`
-	Image      string `yaml:"image,omitempty"`
-	Compose    bool   `yaml:"compose,omitempty"`
+	Enabled      bool   `yaml:"enabled"`
+	Engine       string `yaml:"engine,omitempty"`        // docker, containerd, podman
+	Dockerfile   string `yaml:"dockerfile,omitempty"`    // custom Dockerfile path, e.g. "Dockerfile", "Dockerfile.moreops", "services/api/Dockerfile"
+	Context      string `yaml:"context,omitempty"`       // build context, default "."
+	KeepExisting bool   `yaml:"keep_existing,omitempty"` // if true, do not overwrite existing Dockerfile
+	Image        string `yaml:"image,omitempty"`
+	Compose      bool   `yaml:"compose,omitempty"`
 }
 
 // KubernetesModuleConfig configures Kubernetes workload deployment.

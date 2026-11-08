@@ -137,3 +137,77 @@ func TestKubernetesPlanWithTraefikAndCaddyIngress(t *testing.T) {
 		t.Errorf("expected traefik annotations in values.yaml, got:\n%s", valuesContent)
 	}
 }
+
+func TestKubernetesPlanMultiEnvironments(t *testing.T) {
+	m := &Module{}
+	cfg := &config.Config{
+		Project: config.ProjectMeta{
+			Name: "multi-env-app",
+		},
+		Environments: map[string]config.EnvironmentConfig{
+			"dev": {
+				Cluster:   "local-ctx",
+				Namespace: "default",
+			},
+			"staging": {
+				Cluster:   "staging-ctx",
+				Namespace: "staging",
+			},
+			"prod": {
+				Cluster:   "prod-ctx",
+				Namespace: "production",
+			},
+		},
+		Modules: config.ModulesConfig{
+			Kubernetes: &config.KubernetesModuleConfig{
+				Enabled:  true,
+				Tool:     "helm",
+				Port:     8080,
+				Replicas: 2,
+			},
+		},
+	}
+
+	plan, err := m.Plan(context.Background(), cfg, "prod")
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
+
+	var foundDev, foundStaging, foundProd, foundPDB bool
+	for _, fc := range plan.FileChanges {
+		if strings.HasSuffix(fc.Path, "values-dev.yaml") {
+			foundDev = true
+			if !strings.Contains(fc.NewData, "replicaCount: 1") || !strings.Contains(fc.NewData, "ENVIRONMENT") {
+				t.Error("expected dev overrides in values-dev.yaml")
+			}
+		}
+		if strings.HasSuffix(fc.Path, "values-staging.yaml") {
+			foundStaging = true
+			if !strings.Contains(fc.NewData, "replicaCount: 2") || !strings.Contains(fc.NewData, "staging.multi-env-app.internal") {
+				t.Error("expected staging overrides in values-staging.yaml")
+			}
+		}
+		if strings.HasSuffix(fc.Path, "values-prod.yaml") {
+			foundProd = true
+			if !strings.Contains(fc.NewData, "replicaCount: 3") || !strings.Contains(fc.NewData, "podDisruptionBudget:") {
+				t.Error("expected prod overrides with PDB in values-prod.yaml")
+			}
+		}
+		if strings.HasSuffix(fc.Path, "poddisruptionbudget.yaml") {
+			foundPDB = true
+		}
+	}
+
+	if !foundDev {
+		t.Error("values-dev.yaml not found in plan")
+	}
+	if !foundStaging {
+		t.Error("values-staging.yaml not found in plan")
+	}
+	if !foundProd {
+		t.Error("values-prod.yaml not found in plan")
+	}
+	if !foundPDB {
+		t.Error("poddisruptionbudget.yaml not found in plan")
+	}
+}

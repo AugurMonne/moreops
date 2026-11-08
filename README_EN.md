@@ -94,7 +94,9 @@ For CI/CD pipelines, skip interactive prompt:
 
 | Wizard Option | Choices Available | Generated Output & Capabilities |
 | :--- | :--- | :--- |
-| **Workload Strategy** | `Helm` (Recommended), `Kustomize`, `Raw Manifests` | Full Helm chart (`charts/<app>/`) with values overlays, Kustomize overlays, or plain manifests |
+| **Target Environments** | `dev`, `staging`, `prod` (Multi-select) | Multi-environment Helm values (`values-dev.yaml`, `values-staging.yaml`, `values-prod.yaml`) and Kustomize overlays (`overlays/dev`, `staging`, `prod`) with customized replicas, resources, HPA, PDB, and ingress |
+| **Dockerfile Location** | `Keep existing`, `Overwrite`, `Custom path` | Non-destructive detection of existing Dockerfile, support for custom paths (`services/api/Dockerfile`) and build contexts in monorepos |
+| **Workload Strategy** | `Helm` (Recommended), `Kustomize`, `Raw Manifests` | Full Helm chart (`charts/<app>/`) with values schema validation (`values.schema.json`), Kustomize overlays, or plain manifests |
 | **Replicas & HPA** | Initial replica count + HPA max replicas | HorizontalPodAutoscaler manifest without GitOps flapping conflicts |
 | **Ingress Controller** | `NGINX`, `Traefik`, `Caddy`, `HAProxy`, `Custom` | Ingress manifest with automated controller annotations (`className`, TLS, SSL redirect, router entrypoints) |
 | **Database** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Battle-tested stable images (`postgres:16-alpine`, `mysql:8.0`, `redis:7-alpine`), Compose service with healthchecks, K8s connection secrets and env (configurable via `.Values.database.image`) |

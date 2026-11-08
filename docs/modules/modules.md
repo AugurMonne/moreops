@@ -6,17 +6,23 @@
 
 ## 1. Containers (`containers`)
 - **Hardened Multi-stage Dockerfile**: генерация минималистичного образа с distroless/alpine рантаймом под язык проекта (Go, Node.js, Python, Java, Rust, .NET).
-- **UID/GID 10001 (Non-root)**: запуск контейнера от непривилегированного пользователя.
-- **Docker Compose**: локальный стек (`docker-compose.yml`) со встроенными healthcheck-проверками.
+- **UID/GID 10001 / non-root**: запуск контейнера от непривилегированного пользователя.
+- **Гибкий путь к Dockerfile**: поддержка кастомных путей (`dockerfile: "services/api/Dockerfile"`, `context: "services/api"`), что идеально подходит для монорепозиториев и микросервисов.
+- **Защита существующего Dockerfile**: если в проекте уже есть свой Dockerfile, MoreOps предлагает сохранить его (`keep_existing: true`), создавая только `.dockerignore` и корректно настроенный `docker-compose.yml`.
+- **Docker Compose**: локальный стек (`docker-compose.yml`) со встроенными healthcheck-проверками, базой данных и RabbitMQ.
 - **`.dockerignore`**: исключение лишних файлов, артефактов компиляции и конфиденциальных `.env*`.
 
 ---
 
 ## 2. Kubernetes (`kubernetes`)
 - **Helm Chart (дефолтный стандарт)**:
-  - Структура чарта в `charts/<app>/` (Chart.yaml, values.yaml, templates/).
-  - Шаблоны: Deployment, Service, Ingress, HPA, NetworkPolicy (строгие правила с точечным egress к DNS, базам данных и брокеру).
-  - Средовые оверлеи: `values-dev.yaml`, `values-prod.yaml`.
+  - Структура чарта в `charts/<app>/` (Chart.yaml, values.yaml, values.schema.json, templates/).
+  - Шаблоны: Deployment, Service, Ingress, HPA, PodDisruptionBudget, NetworkPolicy (строгие правила с точечным egress к DNS, базам данных и брокеру).
+  - Средовые оверлеи: `values-dev.yaml`, `values-staging.yaml`, `values-prod.yaml`.
+    - **`dev`**: 1 реплика, легкие ресурсы (50m/200m CPU, 64Mi/256Mi RAM), HPA отключен, Ingress `dev.<app>.local`, `LOG_LEVEL=debug`.
+    - **`staging`**: 2 реплики, средние ресурсы (100m/500m CPU, 128Mi/512Mi RAM), HPA (2-5 реплик), Ingress `staging.<app>.internal`, `LOG_LEVEL=info`.
+    - **`prod`**: 3+ реплики, строгие лимиты (200m/1000m CPU, 256Mi/1Gi RAM), HPA (3-20 реплик), PodDisruptionBudget (`minAvailable: 1`), боевой TLS Ingress `<app>.company.com` с cert-manager, `LOG_LEVEL=warn`.
+  - Валидация типов по JSON-схеме (`values.schema.json`).
 - **Поддержка Ingress-контроллеров (Что можно выбрать и что вы получите)**:
   - `nginx` (**NGINX Ingress**, дефолт): аннотации `nginx.ingress.kubernetes.io/ssl-redirect: "true"`, `className: "nginx"`.
   - `traefik` (**Traefik Ingress**): автоматические аннотации `traefik.ingress.kubernetes.io/router.entrypoints: web,websecure`, `traefik.ingress.kubernetes.io/router.tls: "true"`, `className: "traefik"`.
@@ -25,7 +31,7 @@
   - `custom`: ввод произвольного `ingressClassName` и свободных аннотаций.
 - **Kustomize**:
   - Базовые манифесты в `k8s/base/` с `kustomization.yaml`.
-  - Оверлеи окружений в `k8s/overlays/dev/` и `k8s/overlays/prod/`.
+  - Оверлеи окружений в `k8s/overlays/dev/`, `k8s/overlays/staging/` и `k8s/overlays/prod/`.
 - **Raw Manifests**:
   - Прямые манифесты для быстрого развертывания в `k8s/` с учетом выбранного `ingressClassName`.
 

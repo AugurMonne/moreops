@@ -323,14 +323,92 @@ resources:
     memory: 256Mi
 autoscaling:
   enabled: false
-`),
+ingress:
+  hosts:
+    - host: dev.%s.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+env:
+  - name: LOG_LEVEL
+    value: "debug"
+  - name: ENVIRONMENT
+    value: "development"
+`, appName),
+
+		filepath.Join(chartDir, "values-staging.yaml"): fmt.Sprintf(`replicaCount: 2
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+ingress:
+  hosts:
+    - host: staging.%s.internal
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+env:
+  - name: LOG_LEVEL
+    value: "info"
+  - name: ENVIRONMENT
+    value: "staging"
+`, appName),
 
 		filepath.Join(chartDir, "values-prod.yaml"): fmt.Sprintf(`replicaCount: 3
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
 autoscaling:
   enabled: true
   minReplicas: 3
   maxReplicas: 20
-`),
+  targetCPUUtilizationPercentage: 75
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+ingress:
+  hosts:
+    - host: %s.company.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls:
+    - secretName: %s-prod-tls
+      hosts:
+        - %s.company.com
+env:
+  - name: LOG_LEVEL
+    value: "warn"
+  - name: ENVIRONMENT
+    value: "production"
+`, appName, appName, appName),
+
+		filepath.Join(templatesDir, "poddisruptionbudget.yaml"): fmt.Sprintf(`{{- if and .Values.podDisruptionBudget .Values.podDisruptionBudget.enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "%s.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "%s.name" . }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable | default 1 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "%s.name" . }}
+{{- end }}
+`, appName, appName, appName),
 
 		filepath.Join(templatesDir, "_helpers.tpl"): fmt.Sprintf(`{{/*
 Expand the name of the chart.
@@ -752,6 +830,7 @@ spec:
 func generateKustomize(appName, namespace, image string, port, replicas int, ingress bool, envName string) ([]diff.FileChange, error) {
 	baseDir := filepath.Join("k8s", "base")
 	overlayDevDir := filepath.Join("k8s", "overlays", "dev")
+	overlayStagingDir := filepath.Join("k8s", "overlays", "staging")
 	overlayProdDir := filepath.Join("k8s", "overlays", "prod")
 
 	files := map[string]string{
@@ -868,6 +947,22 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 1
+    target:
+      kind: Deployment
+      name: %s
+`, appName, appName),
+
+		filepath.Join(overlayStagingDir, "kustomization.yaml"): fmt.Sprintf(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: %s-staging
+namePrefix: staging-
+resources:
+  - ../../base
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
     target:
       kind: Deployment
       name: %s
