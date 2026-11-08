@@ -18,6 +18,9 @@
 - `moreops version`
   Отображение текущей версии MoreOps.
 
+- `moreops completion [bash|zsh|fish]`
+  Генерация скрипта автодополнения для вашей командной оболочки.
+
 ---
 
 ### Управление изменениями и манифестами
@@ -32,7 +35,7 @@
   Прямая генерация манифестов конкретного модуля (`monitoring`, `containers`, `kubernetes`, `security`, `storage`, `cicd`) или всей конфигурации.
 
 - `moreops validate [--config <path>] [--security] [--rbac]`
-  Синтаксический и семантический аудит конфигурации, а также статическая проверка безопасности манифестов (SEC001-SEC005, REL001, CON001).
+  Синтаксический и семантический аудит конфигурации, а также статическая проверка безопасности манифестов (SEC001-SEC009, REL001, CON001).
 
 ---
 
@@ -88,13 +91,23 @@
 
 ---
 
-### Инфраструктура и релизы
+### Helm OCI и Релизы
+
+- `moreops chart package [path]`
+  Упаковка Helm-чарта приложения в архив `.tgz`.
+
+- `moreops chart push <archive.tgz> <oci://registry/path>`
+  Публикация упакованного чарта в корпоративный OCI-реджистри (GitHub Packages, Yandex Container Registry, Harbor).
+
+- `moreops release [patch|minor|major]`
+  Автоматический бамп версии (SemVer), обновление `moreops.yaml`, `Chart.yaml` и запись в `CHANGELOG.md`.
+
+---
+
+### Инфраструктура (IaC)
 
 - `moreops iac plan`
   Запуск `tofu plan` или `terraform plan` в директории `terraform/`.
 
 - `moreops iac apply [--yes]`
   Применение изменений OpenTofu/Terraform с подтверждением.
-
-- `moreops release [patch|minor|major]`
-  Автоматический бамп версии (SemVer), обновление `moreops.yaml`, `Chart.yaml` и запись в `CHANGELOG.md`.

@@ -111,7 +111,7 @@ MoreOps выведет diff и запросит подтверждение:
 ### 5. Валидация и проверка безопасности
 
 ```bash
-# Проверка синтаксиса и Security Linter (SEC001-SEC005)
+# Проверка синтаксиса и Security Linter (SEC001-SEC009, REL001, CON001)
 ./bin/moreops validate
 
 # Сканирование файловой системы и манифестов через Trivy
@@ -120,6 +120,8 @@ MoreOps выведет diff и запросит подтверждение:
 # Запуск тестов на временном k3d кластере
 ./bin/moreops test --ephemeral
 ```
+
+> 📖 **Пошаговое руководство по проверке вручную**: см. [Manual Testing Guide](docs/getting-started/manual-testing-guide.md).
 
 ---
 

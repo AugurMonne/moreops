@@ -13,6 +13,8 @@
 - `readOnlyRootFilesystem: true`: файловая система контейнера доступна только для чтения; запись разрешена только во временные тома `emptyDir`.
 - `capabilities: { drop: ["ALL"] }`: сброс всех потенциально опасных Linux capabilities.
 - `seccompProfile: { type: "RuntimeDefault" }`: стандартный профиль фильтрации системных вызовов.
+- Запрет `hostNetwork: true`, `hostPID: true`, `hostIPC: true`: поды не могут перехватывать сетевой стек и процессы хоста.
+- Запрет `hostPath` томов: монтирование директорий хостовой ноды запрещено.
 
 ---
 
@@ -40,5 +42,10 @@
 - **SEC002**: Контейнер обязан содержать `allowPrivilegeEscalation: false`.
 - **SEC003**: Контейнер должен использовать `readOnlyRootFilesystem: true`.
 - **SEC004**: Обязательное указание CPU/Memory `requests` и `limits` (защита от DoS ноды).
+- **SEC005**: Категорический запрет запуска привилегированных контейнеров (`privileged: true`).
+- **SEC006**: Запрет использования пространств имен хоста (`hostNetwork`, `hostPID`, `hostIPC`).
+- **SEC007**: Запрет использования небезопасных томов `hostPath`.
+- **SEC008**: Запрет явного указания root-пользователя (`runAsUser: 0`).
+- **SEC009**: Контейнер должен сбрасывать все capabilities (`drop: ["ALL"]`).
 - **REL001**: Обязательное наличие `livenessProbe` и `readinessProbe`.
 - **CON001**: Согласованность селекторов Service с метками Deployment.

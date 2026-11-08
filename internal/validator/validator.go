@@ -138,6 +138,62 @@ func checkSecurityRules(res RawK8sResource, file string) []Issue {
 			if nonRoot, ok := podSecCtx["runAsNonRoot"].(bool); ok && nonRoot {
 				runAsNonRoot = true
 			}
+			if runAsUser, ok := podSecCtx["runAsUser"].(int); ok && runAsUser == 0 {
+				issues = append(issues, Issue{
+					RuleID:   "SEC008",
+					Severity: SeverityError,
+					Resource: resIdentifier,
+					File:     file,
+					Message:  "Pod securityContext explicitly sets runAsUser: 0 (root)",
+				})
+			}
+		}
+
+		// SEC006: Host namespace isolation (hostNetwork, hostPID, hostIPC)
+		if hostNet, ok := spec["hostNetwork"].(bool); ok && hostNet {
+			issues = append(issues, Issue{
+				RuleID:   "SEC006",
+				Severity: SeverityError,
+				Resource: resIdentifier,
+				File:     file,
+				Message:  "Pod spec must not set hostNetwork: true",
+			})
+		}
+		if hostPID, ok := spec["hostPID"].(bool); ok && hostPID {
+			issues = append(issues, Issue{
+				RuleID:   "SEC006",
+				Severity: SeverityError,
+				Resource: resIdentifier,
+				File:     file,
+				Message:  "Pod spec must not set hostPID: true",
+			})
+		}
+		if hostIPC, ok := spec["hostIPC"].(bool); ok && hostIPC {
+			issues = append(issues, Issue{
+				RuleID:   "SEC006",
+				Severity: SeverityError,
+				Resource: resIdentifier,
+				File:     file,
+				Message:  "Pod spec must not set hostIPC: true",
+			})
+		}
+
+		// SEC007: hostPath volume forbidden
+		if volumes, ok := spec["volumes"].([]any); ok {
+			for _, v := range volumes {
+				if vMap, ok := v.(map[string]any); ok {
+					if _, hasHostPath := vMap["hostPath"]; hasHostPath {
+						vName, _ := vMap["name"].(string)
+						issues = append(issues, Issue{
+							RuleID:   "SEC007",
+							Severity: SeverityError,
+							Resource: resIdentifier,
+							File:     file,
+							Message:  fmt.Sprintf("Volume '%s' uses insecure hostPath volume mount", vName),
+						})
+					}
+				}
+			}
 		}
 
 		containers, _ := spec["containers"].([]any)
@@ -157,6 +213,52 @@ func checkSecurityRules(res RawK8sResource, file string) []Issue {
 				if nr, ok := cSecCtx["runAsNonRoot"].(bool); ok && nr {
 					containerNonRoot = true
 				}
+			}
+
+			// SEC005: privileged container execution forbidden
+			if cSecCtx != nil {
+				if priv, ok := cSecCtx["privileged"].(bool); ok && priv {
+					issues = append(issues, Issue{
+						RuleID:   "SEC005",
+						Severity: SeverityError,
+						Resource: resIdentifier,
+						File:     file,
+						Message:  fmt.Sprintf("Container '%s' must not run in privileged mode (privileged: true)", cName),
+					})
+				}
+				if runAsUser, ok := cSecCtx["runAsUser"].(int); ok && runAsUser == 0 {
+					issues = append(issues, Issue{
+						RuleID:   "SEC008",
+						Severity: SeverityError,
+						Resource: resIdentifier,
+						File:     file,
+						Message:  fmt.Sprintf("Container '%s' explicitly sets runAsUser: 0 (root)", cName),
+					})
+				}
+			}
+
+			// SEC009: Drop capabilities check
+			hasDropAll := false
+			if cSecCtx != nil {
+				if caps, ok := cSecCtx["capabilities"].(map[string]any); ok {
+					if dropList, ok := caps["drop"].([]any); ok {
+						for _, d := range dropList {
+							if dStr, ok := d.(string); ok && strings.ToUpper(dStr) == "ALL" {
+								hasDropAll = true
+								break
+							}
+						}
+					}
+				}
+			}
+			if !hasDropAll {
+				issues = append(issues, Issue{
+					RuleID:   "SEC009",
+					Severity: SeverityWarning,
+					Resource: resIdentifier,
+					File:     file,
+					Message:  fmt.Sprintf("Container '%s' should drop all capabilities (capabilities.drop: [\"ALL\"])", cName),
+				})
 			}
 
 			// SEC001: runAsNonRoot
