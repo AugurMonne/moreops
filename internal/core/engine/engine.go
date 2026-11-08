@@ -85,14 +85,17 @@ func (e *Engine) Plan(ctx context.Context, cfg *config.Config, envName string) (
 
 // PrintDiff renders formatted diff for the entire plan.
 func (e *Engine) PrintDiff(plan *CompositePlan, useColor bool) {
-	if len(plan.Changes) == 0 {
-		fmt.Fprintln(e.out, "No infrastructure changes planned.")
+	hasMutations := plan.ToCreate > 0 || plan.ToUpdate > 0 || plan.ToDelete > 0
+	if !hasMutations {
+		fmt.Fprintf(e.out, "\n✓ No infrastructure changes planned for environment [%s]. All %d resources are up to date.\n", plan.Environment, plan.Unchanged)
 		return
 	}
 
 	fmt.Fprintf(e.out, "\n--- Planned Changes for Environment [%s] ---\n\n", plan.Environment)
 	for _, fc := range plan.Changes {
-		fmt.Fprint(e.out, diff.UnifiedDiff(fc, useColor))
+		if fc.Action != diff.ActionNone {
+			fmt.Fprint(e.out, diff.UnifiedDiff(fc, useColor))
+		}
 	}
 
 	fmt.Fprintf(e.out, "\nPlan summary: %d to create, %d to update, %d to delete, %d unchanged.\n",

@@ -123,6 +123,11 @@ spec:
       labels:
         app.kubernetes.io/name: vault-dev
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
         - name: vault
           image: hashicorp/vault:1.16
@@ -131,11 +136,19 @@ spec:
               name: http
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
             capabilities:
               drop:
                 - ALL
               add:
                 - IPC_LOCK
+          volumeMounts:
+            - name: vault-tmp
+              mountPath: /tmp
+      volumes:
+        - name: vault-tmp
+          emptyDir: {}
           env:
             - name: VAULT_DEV_ROOT_TOKEN_ID
               value: "root-dev-token"

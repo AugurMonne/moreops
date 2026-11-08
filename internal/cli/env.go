@@ -10,7 +10,12 @@ import (
 	"moreops/internal/core/diff"
 )
 
-var envConfigPath string
+var (
+	envConfigPath    string
+	envAddCluster    string
+	envAddNamespace  string
+	envAddCloud      string
+)
 
 var envCmd = &cobra.Command{
 	Use:   "env",
@@ -122,24 +127,40 @@ var envAddCmd = &cobra.Command{
 			cfg.Environments = make(map[string]config.EnvironmentConfig)
 		}
 
+		cluster := envAddCluster
+		if cluster == "" {
+			cluster = name + "-cluster"
+		}
+		namespace := envAddNamespace
+		if namespace == "" {
+			namespace = cfg.Project.Name + "-" + name
+		}
+		cloud := envAddCloud
+		if cloud == "" {
+			cloud = "local"
+		}
+
 		cfg.Environments[name] = config.EnvironmentConfig{
-			Cluster:   name + "-cluster",
-			Namespace: cfg.Project.Name + "-" + name,
-			Cloud:     "local",
+			Cluster:   cluster,
+			Namespace: namespace,
+			Cloud:     cloud,
 		}
 
 		if err := config.SaveConfig(envConfigPath, cfg); err != nil {
 			return fmt.Errorf("failed saving config: %w", err)
 		}
 
-		cmd.Printf("✓ Added environment '%s' (cluster: %s-cluster, namespace: %s-%s)\n",
-			name, name, cfg.Project.Name, name)
+		cmd.Printf("✓ Added environment '%s' (cluster: %s, namespace: %s, cloud: %s)\n",
+			name, cluster, namespace, cloud)
 		return nil
 	},
 }
 
 func init() {
 	envCmd.PersistentFlags().StringVarP(&envConfigPath, "config", "c", config.DefaultConfigFileName, "Path to moreops.yaml")
+	envAddCmd.Flags().StringVar(&envAddCluster, "cluster", "", "Target Kubernetes cluster or context name")
+	envAddCmd.Flags().StringVar(&envAddNamespace, "namespace", "", "Target Kubernetes namespace")
+	envAddCmd.Flags().StringVar(&envAddCloud, "cloud", "local", "Cloud provider (yandex, vkcloud, selectel, aws, local)")
 	envCmd.AddCommand(envListCmd)
 	envCmd.AddCommand(envSwitchCmd)
 	envCmd.AddCommand(envDiffCmd)

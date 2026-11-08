@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"moreops/internal/core/config"
@@ -48,6 +49,13 @@ var validateCmd = &cobra.Command{
 		val := validator.NewValidator()
 		var allIssues []validator.Issue
 
+		// 1. Audit application source code syntax
+		srcIssues, _ := val.ValidateSourceFiles(".")
+		if len(srcIssues) > 0 {
+			allIssues = append(allIssues, srcIssues...)
+		}
+
+		// 2. Audit manifests
 		scanDirs := []string{"k8s", "charts"}
 		for _, dir := range scanDirs {
 			if info, err := os.Stat(dir); err == nil && info.IsDir() {
@@ -64,6 +72,16 @@ var validateCmd = &cobra.Command{
 		errorCount := 0
 		warnCount := 0
 		for _, issue := range allIssues {
+			if validateRBAC && !validateSecurity {
+				if !strings.HasPrefix(issue.RuleID, "RBAC") && !strings.HasPrefix(issue.RuleID, "CON") {
+					continue
+				}
+			} else if validateSecurity && !validateRBAC {
+				if !strings.HasPrefix(issue.RuleID, "SEC") {
+					continue
+				}
+			}
+
 			if issue.Severity == validator.SeverityError {
 				errorCount++
 				cmd.Printf("  ❌ [%s] %s: %s (%s)\n", issue.RuleID, issue.Resource, issue.Message, issue.File)

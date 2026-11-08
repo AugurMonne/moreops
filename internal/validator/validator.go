@@ -1,9 +1,13 @@
 package validator
 
 import (
+	"bufio"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -46,6 +50,80 @@ type RawK8sResource struct {
 	Spec map[string]any `yaml:"spec"`
 }
 
+// ValidateSourceFiles checks the syntax of application code (e.g. Go source files).
+func (v *Validator) ValidateSourceFiles(root string) ([]Issue, error) {
+	var issues []Issue
+	fset := token.NewFileSet()
+
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil {
+			return nil
+		}
+		if info.IsDir() {
+			if path == root || path == "." || info.Name() == "." {
+				return nil
+			}
+			name := info.Name()
+			if strings.HasPrefix(name, ".") || name == "vendor" || name == "node_modules" || name == "charts" || name == "k8s" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if filepath.Ext(path) == ".go" {
+			_, parseErr := parser.ParseFile(fset, path, nil, parser.AllErrors)
+			if parseErr != nil {
+				issues = append(issues, Issue{
+					RuleID:   "SYN002",
+					Severity: SeverityError,
+					Resource: "SourceCode/" + filepath.Base(path),
+					File:     path,
+					Message:  fmt.Sprintf("Language syntax error: %v", parseErr),
+				})
+			}
+		}
+		return nil
+	})
+
+	return issues, nil
+}
+
+func sanitizeHelmYAML(content string) string {
+	var lines []string
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	re := regexp.MustCompile(`\{\{[^}]*\}\}`)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
+
+		// Check if line is a toYaml or include block under a parent key
+		if strings.HasPrefix(trimmed, "{{- toYaml") || strings.HasPrefix(trimmed, "{{ toYaml") ||
+			strings.HasPrefix(trimmed, "{{- include") || strings.HasPrefix(trimmed, "{{ include") {
+			indent := len(line) - len(strings.TrimLeft(line, " "))
+			lines = append(lines, strings.Repeat(" ", indent)+"placeholder: val")
+			continue
+		}
+
+		// Full-line control structure (e.g. {{- if ... }}, {{- end }}, {{- with ... }})
+		if (strings.HasPrefix(trimmed, "{{-") || strings.HasPrefix(trimmed, "{{")) &&
+			(strings.HasSuffix(trimmed, "-}}") || strings.HasSuffix(trimmed, "}}")) {
+			colonIdx := strings.Index(line, ":")
+			firstTpl := strings.Index(line, "{{")
+			if colonIdx == -1 || colonIdx > firstTpl {
+				indent := len(line) - len(strings.TrimLeft(line, " "))
+				lines = append(lines, strings.Repeat(" ", indent)+"# helm-tpl")
+				continue
+			}
+		}
+
+		// Replace inline {{ ... }} with a bare identifier helm_val (not quoted, so helm_val-suffix works)
+		cleaned := re.ReplaceAllString(line, "helm_val")
+		lines = append(lines, cleaned)
+	}
+	return strings.Join(lines, "\n")
+}
+
 // ValidateDirectory inspects all YAML manifests in a directory tree.
 func (v *Validator) ValidateDirectory(root string) ([]Issue, error) {
 	var issues []Issue
@@ -84,21 +162,26 @@ func (v *Validator) ValidateDirectory(root string) ([]Issue, error) {
 			// Check YAML syntax
 			var node yaml.Node
 			if err := yaml.Unmarshal([]byte(trimmed), &node); err != nil {
-				// If it's a Helm template with Go template brackets {{ }}, ignore strict syntax
-				if strings.Contains(trimmed, "{{") && strings.Contains(trimmed, "}}") {
+				sanitized := sanitizeHelmYAML(trimmed)
+				if errSanitized := yaml.Unmarshal([]byte(sanitized), &node); errSanitized != nil {
+					issues = append(issues, Issue{
+						RuleID:   "SYN001",
+						Severity: SeverityError,
+						Resource: "Manifest/" + filepath.Base(path),
+						File:     path,
+						Message:  fmt.Sprintf("Invalid YAML syntax: %v", errSanitized),
+					})
 					continue
 				}
-				issues = append(issues, Issue{
-					RuleID:   "SYN001",
-					Severity: SeverityError,
-					File:     path,
-					Message:  fmt.Sprintf("Invalid YAML syntax: %v", err),
-				})
-				continue
 			}
 
 			var res RawK8sResource
-			if err := yaml.Unmarshal([]byte(trimmed), &res); err == nil && res.Kind != "" {
+			if err := yaml.Unmarshal([]byte(trimmed), &res); err != nil {
+				sanitized := sanitizeHelmYAML(trimmed)
+				_ = yaml.Unmarshal([]byte(sanitized), &res)
+			}
+
+			if res.Kind != "" {
 				resources = append(resources, res)
 				resourceFiles = append(resourceFiles, path)
 				issues = append(issues, checkSecurityRules(res, path)...)
@@ -117,9 +200,29 @@ func (v *Validator) ValidateDirectory(root string) ([]Issue, error) {
 	return issues, nil
 }
 
+func findValuesYaml(file string) map[string]any {
+	dir := filepath.Dir(file)
+	for i := 0; i < 3; i++ {
+		valPath := filepath.Join(dir, "values.yaml")
+		if data, err := os.ReadFile(valPath); err == nil {
+			var m map[string]any
+			if err := yaml.Unmarshal(data, &m); err == nil {
+				return m
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return nil
+}
+
 func checkSecurityRules(res RawK8sResource, file string) []Issue {
 	var issues []Issue
 	resIdentifier := fmt.Sprintf("%s/%s", res.Kind, res.Metadata.Name)
+	valuesMap := findValuesYaml(file)
 
 	if res.Kind == "Deployment" || res.Kind == "StatefulSet" || res.Kind == "DaemonSet" {
 		template, ok := res.Spec["template"].(map[string]any)
@@ -133,6 +236,20 @@ func checkSecurityRules(res RawK8sResource, file string) []Issue {
 
 		// Check Pod-level securityContext
 		podSecCtx, _ := spec["securityContext"].(map[string]any)
+		if podSecCtx == nil && valuesMap != nil {
+			if v, ok := valuesMap["podSecurityContext"].(map[string]any); ok {
+				podSecCtx = v
+			}
+		} else if podSecCtx != nil && valuesMap != nil {
+			if v, ok := valuesMap["podSecurityContext"].(map[string]any); ok {
+				for k, val := range v {
+					if _, exists := podSecCtx[k]; !exists {
+						podSecCtx[k] = val
+					}
+				}
+			}
+		}
+
 		runAsNonRoot := false
 		if podSecCtx != nil {
 			if nonRoot, ok := podSecCtx["runAsNonRoot"].(bool); ok && nonRoot {
@@ -208,6 +325,36 @@ func checkSecurityRules(res RawK8sResource, file string) []Issue {
 			}
 
 			cSecCtx, _ := cMap["securityContext"].(map[string]any)
+			if cSecCtx == nil && valuesMap != nil {
+				if v, ok := valuesMap["securityContext"].(map[string]any); ok {
+					cSecCtx = v
+				}
+			} else if cSecCtx != nil && valuesMap != nil {
+				if v, ok := valuesMap["securityContext"].(map[string]any); ok {
+					for k, val := range v {
+						if _, exists := cSecCtx[k]; !exists {
+							cSecCtx[k] = val
+						}
+					}
+				}
+			}
+
+			if cMap["resources"] == nil && valuesMap != nil {
+				if v, ok := valuesMap["resources"].(map[string]any); ok {
+					cMap["resources"] = v
+				}
+			} else if cMap["resources"] != nil && valuesMap != nil {
+				if resMap, ok := cMap["resources"].(map[string]any); ok {
+					if v, ok := valuesMap["resources"].(map[string]any); ok {
+						for k, val := range v {
+							if _, exists := resMap[k]; !exists {
+								resMap[k] = val
+							}
+						}
+					}
+				}
+			}
+
 			containerNonRoot := runAsNonRoot
 			if cSecCtx != nil {
 				if nr, ok := cSecCtx["runAsNonRoot"].(bool); ok && nr {
