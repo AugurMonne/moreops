@@ -73,13 +73,14 @@ For CI/CD pipelines, skip interactive prompt:
 
 ## CLI Overview
 
-- `moreops init`: Interactive project setup wizard with auto-detection.
-- `moreops plan`: Preview planned infrastructure changes with unified diff.
-- `moreops apply`: Apply changes with interactive preview and confirmation (`--yes`).
+- `moreops init`: Interactive project setup wizard with TUI arrow navigation (`↑`/`↓`), `Space` multi-select, and numeric jump keys.
+- `moreops plan [--summary]`: Preview planned changes with unified diff or compact module summary table (`--summary`).
+- `moreops apply [--yes]`: Apply changes with preview, interactive confirmation, and modular per-component synchronization status.
+- `moreops diagnose [--namespace <ns>]`: Root-cause diagnostics for failing workloads, `CrashLoopBackOff`, `OOMKilled` exit 137, and warning events.
 - `moreops validate`: Security, syntax, and RBAC policy linter.
 - `moreops template [list|eject]`: Inspect and eject templates into `.moreops/templates/` for open-source customization.
 - `moreops secrets [init|template|encrypt|decrypt]`: Manage secrets, generate ExternalSecret CRDs, and encrypt files.
-- `moreops doctor`: Comprehensive diagnostics for container runtimes, tools, and secret leak detection.
+- `moreops doctor [--fix]`: Comprehensive diagnostics for tools, runtimes, and secret leak detection with automated fix (`--fix`).
 - `moreops status [--live]`: Show project status or query live Kubernetes cluster pods & HPA.
 - `moreops chart [package|push]`: Package Helm charts (native pure Go fallback) and push to OCI registries.
 - `moreops env [list|add|switch|diff]`: Multi-environment lifecycle management.
@@ -96,11 +97,13 @@ For CI/CD pipelines, skip interactive prompt:
 | **Workload Strategy** | `Helm` (Recommended), `Kustomize`, `Raw Manifests` | Full Helm chart (`charts/<app>/`) with values overlays, Kustomize overlays, or plain manifests |
 | **Replicas & HPA** | Initial replica count + HPA max replicas | HorizontalPodAutoscaler manifest without GitOps flapping conflicts |
 | **Ingress Controller** | `NGINX`, `Traefik`, `Caddy`, `HAProxy`, `Custom` | Ingress manifest with automated controller annotations (`className`, TLS, SSL redirect, router entrypoints) |
-| **Database** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Docker Compose service with healthcheck, Kubernetes connection secrets and env injection |
-| **Database Topology** | `Shared / Cloud DB` vs `Dedicated In-Cluster` | Either connects to external cloud DB (RDS, Yandex) without cluster bloat, or deploys StatefulSet with 10Gi PVC |
-| **DB Migrations** | Enable pre-upgrade migration Job (yes/no) | Kubernetes Job with Helm hook `pre-install,pre-upgrade` preventing broken releases |
-| **RabbitMQ** | Enable AMQP message broker (yes/no) | `rabbitmq:3-management-alpine` in Compose with web UI (15672), K8s NetworkPolicy egress, and env vars |
+| **Database** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Battle-tested stable images (`postgres:16-alpine`, `mysql:8.0`, `redis:7-alpine`), Compose service with healthchecks, K8s connection secrets and env (configurable via `.Values.database.image`) |
+| **Database Topology** | `Shared / Cloud DB` vs `Dedicated In-Cluster` | Either connects to external cloud DB (RDS, Yandex) without cluster bloat, or deploys StatefulSet with 10Gi PVC, non-root security context, and engine-specific readiness checks (`pg_isready`, `mysqladmin ping`, `redis-cli ping`) |
+| **DB Migrations** | Enable pre-upgrade migration Job (yes/no) | Kubernetes Job with Helm hook `pre-install,pre-upgrade` (`migrate/migrate:v4.17.0`) preventing broken releases |
+| **RabbitMQ** | Enable AMQP message broker (yes/no) | `rabbitmq:3.13-management-alpine` in Compose with web UI (15672), K8s NetworkPolicy egress (port 5672), and env vars (configurable via `.Values.rabbitmq.image`) |
+| **Hardened Runtimes** | Go, Node, Python, Rust, Shell | Modern vetted base images: Go on `distroless-debian12:nonroot`, Node 20 LTS, Python 3.11-slim, Alpine 3.20; CI/CD pinned to Docker 26.1 and Trivy 0.51.0 |
 | **Custom Code Protection** | Add `# moreops:ignore` in any file | Prevents `moreops apply` from ever overwriting manual developer changes |
+| **Plan Summary & Apply** | `moreops plan --summary`, `moreops apply` | High-level module changes table and modular per-component synchronization status |
 
 - `moreops validate`: Validate YAML syntax, language code, and security rules (SEC001-SEC009).
 - `moreops monitor status`: Check Prometheus Operator ServiceMonitor and alerts.

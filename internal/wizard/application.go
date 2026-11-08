@@ -183,24 +183,24 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 	// Step 3: Components multi-select
 	w.printStep(3, 4, "Select Architecture Modules")
 	options := DefaultOptions()
-	fmt.Fprintln(w.out, ansiBold+"Choose components to orchestrate (Enter for recommended defaults [1 2]):"+ansiReset)
+	var choiceOptions []Choice
 	for _, opt := range options {
-		fmt.Fprintf(w.out, "\n  %s[%d]%s %s%-34s%s\n      %s%s%s\n",
-			ansiCyan+ansiBold, opt.ID, ansiReset,
-			ansiBold, opt.Name, ansiReset,
-			ansiDim, opt.Description, ansiReset)
-	}
-	fmt.Fprintln(w.out)
-
-	selectionInput := w.Ask(reader, "Enter component numbers (e.g. 1 4, 1,4 or 14)", "1 2")
-	selectedIDs := ParseSelection(selectionInput, len(options))
-	if len(selectedIDs) == 0 {
-		selectedIDs = []int{1, 2}
+		choiceOptions = append(choiceOptions, Choice{
+			ID:          opt.ID,
+			Key:         strconv.Itoa(opt.ID),
+			Label:       opt.Name,
+			Description: opt.Description,
+		})
 	}
 
+	selectedChoices, _ := SelectMulti(reader, w.in, w.out, "Select components to orchestrate", choiceOptions, []int{0, 1})
 	selectedSet := make(map[int]bool)
-	for _, id := range selectedIDs {
-		selectedSet[id] = true
+	for _, sc := range selectedChoices {
+		selectedSet[sc.ID] = true
+	}
+	if len(selectedSet) == 0 {
+		selectedSet[1] = true
+		selectedSet[2] = true
 	}
 
 	w.printStep(4, 4, "Module Configuration & Tuning")
@@ -244,16 +244,13 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 
 	// Module 2: Kubernetes
 	if selectedSet[2] {
-		k8sTool := "helm"
-		toolChoice := w.Ask(reader, "Kubernetes strategy: [1] Raw Manifests, [2] Helm (Recommended), [3] Kustomize", "2")
-		switch strings.TrimSpace(toolChoice) {
-		case "1":
-			k8sTool = "manifests"
-		case "3":
-			k8sTool = "kustomize"
-		default:
-			k8sTool = "helm"
+		k8sChoices := []Choice{
+			{ID: 1, Key: "helm", Label: "Helm (Recommended)", Description: "Full Helm chart with values overlays"},
+			{ID: 2, Key: "manifests", Label: "Raw Manifests", Description: "Standard standalone YAMLs in k8s/"},
+			{ID: 3, Key: "kustomize", Label: "Kustomize", Description: "Overlay-based manifests with kustomization.yaml"},
 		}
+		ch, _ := SelectOne(reader, w.in, w.out, "Kubernetes strategy", k8sChoices, 0)
+		k8sTool := ch.Key
 
 		replicasStr := w.Ask(reader, "Initial replicas count", "2")
 		replicas := 2
@@ -272,24 +269,22 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 			}
 		}
 
-		ingressChoice := w.Ask(reader, "Ingress controller: [1] NGINX (Recommended), [2] Traefik, [3] Caddy, [4] HAProxy, [5] None / Custom", "1")
-		ingressClass := "nginx"
+		ingressChoices := []Choice{
+			{ID: 1, Key: "nginx", Label: "NGINX (Recommended)", Description: "Production standard high-performance controller"},
+			{ID: 2, Key: "traefik", Label: "Traefik", Description: "Cloud-native edge router with dynamic discovery"},
+			{ID: 3, Key: "caddy", Label: "Caddy", Description: "Automatic HTTPS and modern lightweight proxy"},
+			{ID: 4, Key: "haproxy", Label: "HAProxy", Description: "Ultra high-load L4/L7 load balancer"},
+			{ID: 5, Key: "none", Label: "None / Custom", Description: "Skip automated Ingress generation"},
+		}
+		ingChoice, _ := SelectOne(reader, w.in, w.out, "Ingress controller", ingressChoices, 0)
+		ingressClass := ingChoice.Key
 		enableIngress := true
-		switch strings.TrimSpace(ingressChoice) {
-		case "2":
-			ingressClass = "traefik"
-		case "3":
-			ingressClass = "caddy"
-		case "4":
-			ingressClass = "haproxy"
-		case "5":
-			customChoice := w.Ask(reader, "Enable Ingress? (yes/no)", "no")
+		if ingChoice.Key == "none" {
+			customChoice := w.Ask(reader, "Enable custom Ingress? (yes/no)", "no")
 			enableIngress = strings.ToLower(strings.TrimSpace(customChoice)) == "yes" || strings.ToLower(strings.TrimSpace(customChoice)) == "y"
 			if enableIngress {
 				ingressClass = w.Ask(reader, "Custom Ingress class name", "custom")
 			}
-		default: // "1"
-			ingressClass = "nginx"
 		}
 
 		cfg.Modules.Kubernetes = &config.KubernetesModuleConfig{
@@ -310,8 +305,12 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 
 	// Module 3: Monitoring
 	if selectedSet[3] {
-		monChoice := w.Ask(reader, "Observability scope: [1] Metrics & Deep Dashboards (Prometheus, Grafana, Alertmanager), [2] Full Stack (+ Loki & OpenTelemetry)", "1")
-		fullStack := strings.TrimSpace(monChoice) == "2"
+		monChoices := []Choice{
+			{ID: 1, Key: "metrics", Label: "Metrics & Dashboards (Recommended)", Description: "Prometheus Operator, Grafana, Alertmanager"},
+			{ID: 2, Key: "full", Label: "Full Stack Observability", Description: "Metrics + Loki Logs & OpenTelemetry Traces"},
+		}
+		mChoice, _ := SelectOne(reader, w.in, w.out, "Observability scope", monChoices, 0)
+		fullStack := mChoice.Key == "full"
 
 		cfg.Modules.Monitoring = &config.MonitoringModuleConfig{
 			Enabled:        true,
@@ -329,24 +328,24 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 
 	// Module 4: Security
 	if selectedSet[4] {
-		vaultChoice := w.Ask(reader, "Vault setup: [1] In-cluster dev Vault (Recommended for testing), [2] External Vault", "1")
-		vaultMode := "in-cluster-dev"
+		vaultChoices := []Choice{
+			{ID: 1, Key: "in-cluster-dev", Label: "In-cluster dev Vault (Recommended for testing)", Description: "Zero-config dev instance with auto-unseal"},
+			{ID: 2, Key: "external", Label: "External Production Vault", Description: "Connect to enterprise HashiCorp Vault"},
+		}
+		vChoice, _ := SelectOne(reader, w.in, w.out, "Vault deployment mode", vaultChoices, 0)
+		vaultMode := vChoice.Key
 		vaultAddress := "http://vault.vault.svc:8200"
-		if strings.TrimSpace(vaultChoice) == "2" {
-			vaultMode = "external"
+		if vaultMode == "external" {
 			vaultAddress = w.Ask(reader, "External Vault address", "https://vault.example.com")
 		}
 
-		rbacChoice := w.Ask(reader, "RBAC policy: [1] Strict least-privilege ServiceAccount (Recommended), [2] Manual, [3] Skip/Default", "1")
-		rbacMode := "strict"
-		switch strings.TrimSpace(rbacChoice) {
-		case "2":
-			rbacMode = "manual"
-		case "3":
-			rbacMode = "disabled"
-		default:
-			rbacMode = "strict"
+		rbacChoices := []Choice{
+			{ID: 1, Key: "strict", Label: "Strict least-privilege (Recommended)", Description: "Dedicated ServiceAccount with minimal RBAC permissions"},
+			{ID: 2, Key: "manual", Label: "Manual", Description: "Developer-managed Role & RoleBinding"},
+			{ID: 3, Key: "disabled", Label: "Skip / Default", Description: "Default namespace permissions"},
 		}
+		rbacChoice, _ := SelectOne(reader, w.in, w.out, "RBAC policy", rbacChoices, 0)
+		rbacMode := rbacChoice.Key
 
 		cfg.Modules.Security = &config.SecurityModuleConfig{
 			Enabled: true,
@@ -374,30 +373,32 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 
 	// Module 5: Storage & Backup
 	if selectedSet[5] {
-		provChoice := w.Ask(reader, "S3 storage provider: [1] In-cluster MinIO (Dev/Testing), [2] Yandex Cloud Object Storage, [3] VK Cloud Storage, [4] Selectel S3, [5] AWS S3", "1")
-		provider := "minio-dev"
+		provChoices := []Choice{
+			{ID: 1, Key: "minio-dev", Label: "In-cluster MinIO (Recommended for Dev/Testing)", Description: "Local S3 compatible storage"},
+			{ID: 2, Key: "yandex", Label: "Yandex Cloud Object Storage", Description: "ru-central1 managed S3"},
+			{ID: 3, Key: "vkcloud", Label: "VK Cloud Storage", Description: "ru-msk managed S3"},
+			{ID: 4, Key: "selectel", Label: "Selectel S3", Description: "ru-1 managed S3"},
+			{ID: 5, Key: "aws", Label: "AWS S3", Description: "us-east-1 Amazon S3"},
+		}
+		pChoice, _ := SelectOne(reader, w.in, w.out, "S3 storage provider", provChoices, 0)
+		provider := pChoice.Key
 		endpoint := "http://minio:9000"
 		region := "us-east-1"
 
-		switch strings.TrimSpace(provChoice) {
-		case "2":
-			provider = "yandex"
+		switch provider {
+		case "yandex":
 			endpoint = "https://storage.yandexcloud.net"
 			region = "ru-central1"
-		case "3":
-			provider = "vkcloud"
+		case "vkcloud":
 			endpoint = "https://hb.ru-msk.vkcs.cloud"
 			region = "ru-msk"
-		case "4":
-			provider = "selectel"
+		case "selectel":
 			endpoint = "https://s3.ru-1.storage.selcloud.ru"
 			region = "ru-1"
-		case "5":
-			provider = "aws"
+		case "aws":
 			endpoint = "https://s3.amazonaws.com"
 			region = "us-east-1"
 		default:
-			provider = "minio-dev"
 			endpoint = "http://minio:9000"
 			region = "us-east-1"
 		}
@@ -448,57 +449,47 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 
 	// Module 6: CI/CD & Automation
 	if selectedSet[6] {
-		ciChoice := w.Ask(reader, "CI/CD provider: [1] GitHub Actions, [2] GitLab CI, [3] Jenkins", "1")
-		ciProvider := "github"
-		switch strings.TrimSpace(ciChoice) {
-		case "2":
-			ciProvider = "gitlab"
-		case "3":
-			ciProvider = "jenkins"
-		default:
-			ciProvider = "github"
+		ciChoices := []Choice{
+			{ID: 1, Key: "github", Label: "GitHub Actions (Recommended)", Description: "Declarative workflows in .github/workflows/"},
+			{ID: 2, Key: "gitlab", Label: "GitLab CI", Description: "Multi-stage pipeline in .gitlab-ci.yml"},
+			{ID: 3, Key: "jenkins", Label: "Jenkins", Description: "Declarative Jenkinsfile pipeline"},
 		}
+		cChoice, _ := SelectOne(reader, w.in, w.out, "CI/CD automation provider", ciChoices, 0)
+		ciProvider := cChoice.Key
 
-		runnerChoice := w.Ask(reader, "Runner environment: [1] Cloud/Hosted (e.g. ubuntu-latest), [2] Existing self-hosted runner, [3] Scaffold in-cluster runner deployment", "1")
-		runnerType := "cloud"
+		runnerChoices := []Choice{
+			{ID: 1, Key: "cloud", Label: "Cloud / Hosted (Recommended)", Description: "Standard runners (ubuntu-latest / gitlab.com SaaS)"},
+			{ID: 2, Key: "self-hosted", Label: "Existing self-hosted runner", Description: "Pre-configured external enterprise runner"},
+			{ID: 3, Key: "in-cluster", Label: "In-cluster runner deployment", Description: "Scaffold dedicated runner pod in cluster"},
+		}
+		rChoice, _ := SelectOne(reader, w.in, w.out, "Runner environment", runnerChoices, 0)
+		runnerType := rChoice.Key
 		runnerTag := ""
 		installRunner := false
 
-		switch strings.TrimSpace(runnerChoice) {
-		case "2":
-			runnerType = "self-hosted"
+		if runnerType == "self-hosted" {
 			runnerTag = w.Ask(reader, "Runner tag/label", "self-hosted")
-		case "3":
+		} else if runnerType == "in-cluster" {
 			runnerType = "self-hosted"
 			installRunner = true
 			runnerTag = "in-cluster-runner"
-		default:
-			runnerType = "cloud"
 		}
 
-		// GitOps: default is Argo CD on Enter!
-		gitopsChoice := w.Ask(reader, "GitOps engine: [1] Argo CD (Recommended), [2] Flux CD, [3] None", "1")
+		gitopsChoices := []Choice{
+			{ID: 1, Key: "argocd", Label: "Argo CD (Recommended)", Description: "Kubernetes-native declarative GitOps"},
+			{ID: 2, Key: "flux", Label: "Flux CD", Description: "GitOps toolkit controller for Kubernetes"},
+			{ID: 3, Key: "none", Label: "None", Description: "Skip automated GitOps manifest"},
+		}
+		gChoice, _ := SelectOne(reader, w.in, w.out, "GitOps engine", gitopsChoices, 0)
 		var gitopsCfg *config.GitOpsConfig
-		chartPath := fmt.Sprintf("charts/%s", name)
-		if cfg.Modules.Kubernetes != nil && cfg.Modules.Kubernetes.Tool != "helm" {
-			chartPath = "k8s"
-		}
-
-		switch strings.TrimSpace(gitopsChoice) {
-		case "2":
-			gitopsCfg = &config.GitOpsConfig{
-				Enabled:  true,
-				Tool:     "flux",
-				RepoURL:  "https://github.com/org/repo.git",
-				Path:     chartPath,
-				AutoSync: true,
+		if gChoice.Key != "none" {
+			chartPath := fmt.Sprintf("charts/%s", name)
+			if cfg.Modules.Kubernetes != nil && cfg.Modules.Kubernetes.Tool != "helm" {
+				chartPath = "k8s"
 			}
-		case "3":
-			gitopsCfg = nil
-		default: // "1" or Enter
 			gitopsCfg = &config.GitOpsConfig{
 				Enabled:  true,
-				Tool:     "argocd",
+				Tool:     gChoice.Key,
 				RepoURL:  "https://github.com/org/repo.git",
 				Path:     chartPath,
 				AutoSync: true,
@@ -533,48 +524,54 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 	}
 
 	// Database Dependency
-	dbChoice := w.Ask(reader, "Database dependency: [1] None, [2] PostgreSQL (Recommended), [3] MySQL, [4] Redis", "1")
+	dbChoices := []Choice{
+		{ID: 1, Key: "none", Label: "None (Recommended)", Description: "Skip database integration"},
+		{ID: 2, Key: "postgres", Label: "PostgreSQL", Description: "LTS postgres:16-alpine (relational DB)"},
+		{ID: 3, Key: "mysql", Label: "MySQL", Description: "LTS mysql:8.0 (relational DB)"},
+		{ID: 4, Key: "redis", Label: "Redis", Description: "redis:7-alpine (in-memory key-value/cache)"},
+	}
+	dbChoice, _ := SelectOne(reader, w.in, w.out, "Database dependency", dbChoices, 0)
 	var dbCfg *config.DatabaseModuleConfig
-	switch strings.TrimSpace(dbChoice) {
-	case "2":
-		topChoice := w.Ask(reader, "Database cluster topology: [1] Shared / Cloud DB (Managed external - Recommended for Prod), [2] Dedicated In-Cluster DB (StatefulSet with PVC)", "1")
-		topology := "shared"
-		if strings.TrimSpace(topChoice) == "2" {
-			topology = "dedicated"
+	switch dbChoice.Key {
+	case "postgres":
+		topChoices := []Choice{
+			{ID: 1, Key: "shared", Label: "Shared / Managed Cloud DB (Recommended)", Description: "Connect to external cloud DB without cluster bloat"},
+			{ID: 2, Key: "dedicated", Label: "Dedicated In-Cluster (StatefulSet)", Description: "Deploy local StatefulSet with 10Gi PVC in namespace"},
 		}
+		topChoice, _ := SelectOne(reader, w.in, w.out, "Database cluster topology", topChoices, 0)
 		migChoice := w.Ask(reader, "Include pre-upgrade Database Migration Job (Helm hook)? (yes/no)", "yes")
 		enableMig := strings.ToLower(strings.TrimSpace(migChoice)) == "yes" || strings.ToLower(strings.TrimSpace(migChoice)) == "y"
 
 		dbCfg = &config.DatabaseModuleConfig{
 			Enabled:   true,
 			Engine:    "postgres",
-			Topology:  topology,
+			Topology:  topChoice.Key,
 			Migration: enableMig,
 			Host:      "postgres.infra.svc.cluster.local",
 			Port:      5432,
 			Name:      name + "_db",
 			User:      name + "_user",
 		}
-	case "3":
-		topChoice := w.Ask(reader, "Database cluster topology: [1] Shared / Cloud DB (Managed external), [2] Dedicated In-Cluster DB", "1")
-		topology := "shared"
-		if strings.TrimSpace(topChoice) == "2" {
-			topology = "dedicated"
+	case "mysql":
+		topChoices := []Choice{
+			{ID: 1, Key: "shared", Label: "Shared / Managed Cloud DB (Recommended)", Description: "Connect to external cloud DB without cluster bloat"},
+			{ID: 2, Key: "dedicated", Label: "Dedicated In-Cluster (StatefulSet)", Description: "Deploy local StatefulSet with 10Gi PVC in namespace"},
 		}
+		topChoice, _ := SelectOne(reader, w.in, w.out, "Database cluster topology", topChoices, 0)
 		migChoice := w.Ask(reader, "Include pre-upgrade Database Migration Job (Helm hook)? (yes/no)", "yes")
 		enableMig := strings.ToLower(strings.TrimSpace(migChoice)) == "yes" || strings.ToLower(strings.TrimSpace(migChoice)) == "y"
 
 		dbCfg = &config.DatabaseModuleConfig{
 			Enabled:   true,
 			Engine:    "mysql",
-			Topology:  topology,
+			Topology:  topChoice.Key,
 			Migration: enableMig,
 			Host:      "mysql.infra.svc.cluster.local",
 			Port:      3306,
 			Name:      name + "_db",
 			User:      name + "_user",
 		}
-	case "4":
+	case "redis":
 		dbCfg = &config.DatabaseModuleConfig{
 			Enabled:   true,
 			Engine:    "redis",
@@ -587,13 +584,18 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 	cfg.Modules.Database = dbCfg
 
 	// Messaging Broker (RabbitMQ)
-	msgChoice := w.Ask(reader, "Include RabbitMQ message broker? (yes/no)", "no")
-	if strings.ToLower(strings.TrimSpace(msgChoice)) == "yes" || strings.ToLower(strings.TrimSpace(msgChoice)) == "y" {
+	msgChoices := []Choice{
+		{ID: 1, Key: "no", Label: "No (Recommended)", Description: "Skip message broker"},
+		{ID: 2, Key: "yes", Label: "Yes (RabbitMQ)", Description: "rabbitmq:3.13-management-alpine with Web UI & network policies"},
+	}
+	msgChoice, _ := SelectOne(reader, w.in, w.out, "Include RabbitMQ message broker?", msgChoices, 0)
+	if msgChoice.Key == "yes" {
 		cfg.Modules.Messaging = &config.MessagingModuleConfig{
 			Enabled: true,
 			Broker:  "rabbitmq",
 			Host:    "rabbitmq.infra.svc.cluster.local",
 			Port:    5672,
+			VHost:   "/",
 		}
 	}
 

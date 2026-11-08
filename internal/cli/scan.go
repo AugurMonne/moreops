@@ -74,14 +74,14 @@ func runTrivyScan(cmd *cobra.Command, scanType, target string) error {
 				"run", "--rm",
 				"-v", "/var/run/docker.sock:/var/run/docker.sock",
 				"-v", fmt.Sprintf("%s:/workspace", absTarget),
-				"aquasec/trivy:latest",
+				"aquasec/trivy:0.51.0",
 				"fs", "--severity", scanSeverity, "/workspace",
 			}
 		} else {
 			dockerArgs = []string{
 				"run", "--rm",
 				"-v", "/var/run/docker.sock:/var/run/docker.sock",
-				"aquasec/trivy:latest",
+				"aquasec/trivy:0.51.0",
 				"image", "--severity", scanSeverity, target,
 			}
 		}

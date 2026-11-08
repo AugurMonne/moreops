@@ -10,5 +10,5 @@ func Available() bool {
 
 // DockerFallbackImage returns the official container image for running Trivy without installation.
 func DockerFallbackImage() string {
-	return "aquasec/trivy:latest"
+	return "aquasec/trivy:0.51.0"
 }

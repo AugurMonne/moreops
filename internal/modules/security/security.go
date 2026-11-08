@@ -146,9 +146,6 @@ spec:
           volumeMounts:
             - name: vault-tmp
               mountPath: /tmp
-      volumes:
-        - name: vault-tmp
-          emptyDir: {}
           env:
             - name: VAULT_DEV_ROOT_TOKEN_ID
               value: "root-dev-token"
@@ -173,6 +170,9 @@ spec:
               port: 8200
             initialDelaySeconds: 5
             periodSeconds: 10
+      volumes:
+        - name: vault-tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

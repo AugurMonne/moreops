@@ -101,9 +101,11 @@
 Модуль баз данных позволяет легко связать приложение с реляционными СУБД или кэшем, поддерживая как локальную разработку, так и облачные продакшен-топологии.
 
 ### Доступные движки:
-- **`postgres` (PostgreSQL, Рекомендовано)**: образ `postgres:16-alpine`, порт `5432`.
-- **`mysql` (MySQL)**: образ `mysql:8.0`, порт `3306`.
-- **`redis` (Redis)**: образ `redis:7-alpine`, порт `6379`.
+- **`postgres` (PostgreSQL, Рекомендовано)**: проверенный стабильный образ `postgres:16-alpine`, порт `5432`.
+- **`mysql` (MySQL)**: LTS-образ `mysql:8.0`, порт `3306`.
+- **`redis` (Redis)**: легковесный образ `redis:7-alpine`, порт `6379`.
+
+> Все версии базовых образов заданы в `.Values.database.image` и легко переопределяются без правки чартов.
 
 ### Топологии развертывания (Что выбрать и что вы получите):
 1. **`shared` — Общая / Managed Cloud DB (Рекомендовано для Production):**
@@ -115,9 +117,9 @@
 2. **`dedicated` — Выделенная база в кластере (StatefulSet):**
    * **Когда выбирать:** Для локальной разработки, QA, демо-стендов или динамических Review-окружений, где микросервису требуется полностью изолированная БД.
    * **Что вы получаете:**
-     - Манифест `charts/<app>/templates/database-statefulset.yaml` со `StatefulSet`, PVC объемом `10Gi` на базе `postgres:16-alpine` и `Service` ClusterIP.
+     - Манифест `charts/<app>/templates/database-statefulset.yaml` со `StatefulSet`, PVC объемом `10Gi` (адаптируется под выбранный движок: `postgres:16-alpine`, `mysql:8.0` или `redis:7-alpine`) и `Service` ClusterIP.
      - Hardened Security Context: запуск от `runAsNonRoot: true`, `runAsUser: 999`, запрет эскалации привилегий (`allowPrivilegeEscalation: false`), сброс всех capabilities (`drop: ["ALL"]`).
-     - Встроенные пробы готовности и жизни через утилиту `pg_isready`.
+     - Встроенные пробы готовности и жизни (`pg_isready`, `mysqladmin ping` или `redis-cli ping`).
 
 ### Автоматические миграции схемы (Database Migration Job):
 - **`migration: true`**:

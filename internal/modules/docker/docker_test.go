@@ -133,7 +133,7 @@ func TestDockerPlanWithDatabaseAndRabbitMQ(t *testing.T) {
 	if !strings.Contains(composeContent, "image: postgres:16-alpine") {
 		t.Error("expected postgres service in docker-compose.yml")
 	}
-	if !strings.Contains(composeContent, "image: rabbitmq:3-management-alpine") {
+	if !strings.Contains(composeContent, "image: rabbitmq:3.13-management-alpine") {
 		t.Error("expected rabbitmq service in docker-compose.yml")
 	}
 	if !strings.Contains(composeContent, "pgdata:") {

@@ -157,8 +157,18 @@ cluster reachability, and project security hygiene.`,
 			if info, err := os.Stat(sf); err == nil {
 				mode := info.Mode().Perm()
 				if mode&0077 != 0 {
-					cmd.Printf("  [!] File Security:  '%s' has loose permissions (%04o). Recommended: 0600\n", sf, mode)
-					warnings++
+					if doctorFix {
+						if err := os.Chmod(sf, 0600); err == nil {
+							cmd.Printf("  [✓] File Security:  Fixed permissions on '%s' -> 0600\n", sf)
+							passed++
+						} else {
+							cmd.Printf("  [!] File Security:  Failed to fix permissions on '%s': %v\n", sf, err)
+							warnings++
+						}
+					} else {
+						cmd.Printf("  [!] File Security:  '%s' has loose permissions (%04o). Recommended: 0600 (Run 'moreops doctor --fix')\n", sf, mode)
+						warnings++
+					}
 				} else {
 					cmd.Printf("  [✓] File Security:  '%s' permissions restricted (%04o)\n", sf, mode)
 					passed++
@@ -167,13 +177,25 @@ cluster reachability, and project security hygiene.`,
 		}
 
 		// Gitignore check
-		if giData, err := os.ReadFile(".gitignore"); err == nil {
-			giStr := string(giData)
-			if strings.Contains(giStr, ".env") || strings.Contains(giStr, ".moreops") {
-				cmd.Println("  [✓] Git Protection: Sensitive patterns (.env, .moreops) ignored in .gitignore")
-				passed++
+		giData, err := os.ReadFile(".gitignore")
+		giStr := string(giData)
+		if err == nil && (strings.Contains(giStr, ".env") || strings.Contains(giStr, ".moreops")) {
+			cmd.Println("  [✓] Git Protection: Sensitive patterns (.env, .moreops) ignored in .gitignore")
+			passed++
+		} else {
+			if doctorFix {
+				f, err := os.OpenFile(".gitignore", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+				if err == nil {
+					f.WriteString("\n# MoreOps secrets and environment files\n.moreops/\n.env\n.env.*\n")
+					f.Close()
+					cmd.Println("  [✓] Git Protection: Fixed .gitignore (added .moreops/, .env)")
+					passed++
+				} else {
+					cmd.Printf("  [!] Git Protection: Failed to update .gitignore: %v\n", err)
+					warnings++
+				}
 			} else {
-				cmd.Println("  [!] Git Protection: .gitignore missing entry for '.moreops' or '.env'")
+				cmd.Println("  [!] Git Protection: .gitignore missing entry for '.moreops' or '.env' (Run 'moreops doctor --fix')")
 				warnings++
 			}
 		}
@@ -188,4 +210,10 @@ cluster reachability, and project security hygiene.`,
 		}
 		cmd.Println()
 	},
+}
+
+var doctorFix bool
+
+func init() {
+	doctorCmd.Flags().BoolVarP(&doctorFix, "fix", "f", false, "Automatically fix file permissions and git security hygiene issues")
 }

@@ -132,13 +132,15 @@ MoreOps выведет diff и запросит подтверждение:
 | **Стратегия Kubernetes** | `Helm` (Рекомендовано), `Kustomize`, `Raw Manifests` | Полноценный Helm-чарт в `charts/<app>/` с оверлеями values, Kustomize-структура в `k8s/` или чистые манифесты |
 | **Реплики и HPA** | Начальное число подов + HPA максимум | `HorizontalPodAutoscaler` без конфликтов с GitOps (поле `replicas` в Deployment опускается при включенном HPA) |
 | **Ingress-контроллер** | `NGINX`, `Traefik`, `Caddy`, `HAProxy`, `Custom` | Автоматическая генерация Ingress манифеста с аннотациями выбранного контроллера (`className`, TLS, SSL redirect, router entrypoints) |
-| **База данных** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Готовый сервис в `docker-compose.yml` с healthcheck, проброс переменных `DB_*` и SecretRef в Kubernetes |
-| **Топология БД** | `Shared / Cloud DB` vs `Dedicated In-Cluster` | Подключение к существующей Cloud DB (Yandex/AWS) без оверхеда, либо локальный `StatefulSet` с PVC 10Gi в неймспейсе |
-| **Миграции БД** | Включение Job миграций (yes/no) | Helm pre-upgrade Job (`migrate/migrate`) — блокирует деплой при ошибках миграций, защищая прод |
-| **RabbitMQ** | Включение брокера (yes/no) | `rabbitmq:3-management-alpine` в Compose с Web UI (15672), сетевые политики NetworkPolicy и переменные `RABBITMQ_*` |
+| **База данных** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Проверенные стабильные образы (`postgres:16-alpine`, `mysql:8.0`, `redis:7-alpine`), готовый сервис в `docker-compose.yml` с healthcheck, проброс переменных `DB_*` и SecretRef в Kubernetes (версия переопределяется в `.Values.database.image`) |
+| **Топология БД** | `Shared / Cloud DB` vs `Dedicated In-Cluster` | Подключение к существующей Cloud DB (Yandex/AWS) без оверхеда, либо локальный `StatefulSet` с PVC 10Gi в неймспейсе с проверками готовности (`pg_isready`, `mysqladmin ping`, `redis-cli ping`) |
+| **Миграции БД** | Включение Job миграций (yes/no) | Helm pre-upgrade Job (`migrate/migrate:v4.17.0`) — блокирует деплой при ошибках миграций, защищая прод |
+| **RabbitMQ** | Включение брокера (yes/no) | `rabbitmq:3.13-management-alpine` в Compose с Web UI (15672), сетевые политики NetworkPolicy (порт 5672) и переменные `RABBITMQ_*` |
+| **Базовые рантаймы** | Go, Node, Python, Rust, Shell | Проверенные современные образы: Go на `distroless-debian12:nonroot`, Node 20 LTS, Python 3.11-slim, Alpine 3.20; CI/CD на Docker 26.1 и Trivy 0.51.0 |
 | **Управление секретами** | `moreops secrets [init\|template\|encrypt]` | Локальный ключ AES-256-GCM, генерация `ExternalSecret`/`SecretStore` CRD, безопасное шифрование файлов |
 | **Кастомизация шаблонов** | `moreops template [list\|eject]` | Извлечение шаблонов в `.moreops/templates/` для open-source доработок; защита ручного кода тегом `# moreops:ignore` |
 | **Диагностика окружения** | `moreops doctor` | Проверка Docker daemon, kubectl, helm, git, прав доступа к файлам (0600) и аудит утечек токенов в конфигах |
+| **Сводка плана и Apply** | `moreops plan --summary`, `moreops apply` | Высокоуровневая сводка изменений по модулям и покомпонентная индикация статуса применения |
 | **Статус живого кластера** | `moreops status --live` | Опрос активного контекста K8s: реальное состояние подов, перезапуски, утилизация HPA |
 
 
@@ -230,12 +232,16 @@ modules:
 
 | Команда | Описание |
 | :--- | :--- |
-| `moreops init` | Интерактивный мастер создания проекта |
-| `moreops doctor` | Диагностика установленных DevOps инструментов |
-| `moreops plan` (или `diff`) | Предпросмотр изменений с цветным unified diff |
-| `moreops apply` | Безопасное применение изменений с подтверждением (`--yes`) |
-| `moreops validate` | Аудит конфигурации и встроенный Security Linter |
+| `moreops init` | Интерактивный мастер создания проекта с TUI-навигацией стрелками (`↑`/`↓`), `Space`, `Enter` |
+| `moreops doctor [--fix]` | Диагностика установленных DevOps инструментов и авто-исправление прав/gitignore (`--fix`) |
+| `moreops diagnose` | Интеллектуальный траблшутинг упавших подов, `CrashLoopBackOff`, `OOMKilled` и Warning-событий |
+| `moreops plan [--summary]` | Предпросмотр изменений с unified diff или компактной сводной таблицей (`--summary`) |
+| `moreops apply [--yes]` | Безопасное применение изменений с покомпонентным прогрессом синхронизации |
+| `moreops status [--live]` | Статус модулей или опрос живого Kubernetes кластера (состояние подов, HPA) |
+| `moreops validate` | Аудит конфигурации и встроенный Security Linter (CIS Benchmark) |
 | `moreops scan [fs\|image]` | Сканирование уязвимостей через Trivy (с Docker fallback) |
+| `moreops template [list\|eject]` | Извлечение встроенных шаблонов в `.moreops/templates/` для кастомизации |
+| `moreops secrets [init\|encrypt\|decrypt]` | Управление ключами AES-256-GCM и шифрование секретов |
 | `moreops cluster [list\|create\|delete]` | Управление локальными кластерами `k3d` |
 | `moreops test [--ephemeral]` | Тестирование манифестов на временных k8s-кластерах |
 | `moreops env [list\|switch\|diff\|add]` | Управление несколькими окружениями (dev, staging, prod) |

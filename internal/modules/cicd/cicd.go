@@ -138,15 +138,15 @@ validate:
 
 security-scan:
   stage: security
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.51.0
   script:
     - trivy fs --severity HIGH,CRITICAL .
 
 build-image:
   stage: build
-  image: docker:24.0
+  image: docker:26.1
   services:
-    - docker:24.0-dind
+    - docker:26.1-dind
   script:
     - docker build -t %s:$CI_COMMIT_SHORT_SHA .
   only:

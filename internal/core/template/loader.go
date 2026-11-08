@@ -141,15 +141,15 @@ lint_and_test:
 
 security_audit:
   stage: validate
-  image: alpine:latest
+  image: alpine:3.20
   script:
     - moreops validate --security
 
 build_image:
   stage: build
-  image: docker:24.0
+  image: docker:26.1
   services:
-    - docker:24.0-dind
+    - docker:26.1-dind
   script:
     - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
 `,

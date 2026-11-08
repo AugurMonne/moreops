@@ -101,14 +101,14 @@ CMD ["python", "main.py"]
 `, port)
 
 	case "rust":
-		dockerfileContent = fmt.Sprintf(`FROM rust:1.77-alpine AS builder
+		dockerfileContent = fmt.Sprintf(`FROM rust:1.78-alpine AS builder
 WORKDIR /src
 RUN apk add --no-cache musl-dev
 COPY Cargo.toml Cargo.lock* ./
 COPY src ./src
 RUN cargo build --release
 
-FROM alpine:3.19
+FROM alpine:3.20
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 WORKDIR /app
@@ -118,7 +118,7 @@ ENTRYPOINT ["/app/server"]
 `, port)
 
 	default:
-		dockerfileContent = fmt.Sprintf(`FROM alpine:3.19
+		dockerfileContent = fmt.Sprintf(`FROM alpine:3.20
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 WORKDIR /app
@@ -235,7 +235,7 @@ vendor
 			dependsOn.WriteString("      rabbitmq:\n        condition: service_healthy\n")
 			extraServices.WriteString(`
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:3.13-management-alpine
     restart: unless-stopped
     ports:
       - "5672:5672"

@@ -137,11 +137,25 @@ func generateHelmChart(appName, namespace, image string, port, replicas int, ing
 	if dbCfg != nil && dbCfg.Enabled {
 		host := dbCfg.Host
 		if host == "" {
-			host = "postgres.infra.svc.cluster.local"
+			switch dbCfg.Engine {
+			case "mysql":
+				host = "mysql.infra.svc.cluster.local"
+			case "redis":
+				host = "redis.infra.svc.cluster.local"
+			default:
+				host = "postgres.infra.svc.cluster.local"
+			}
 		}
 		portVal := dbCfg.Port
 		if portVal <= 0 {
-			portVal = 5432
+			switch dbCfg.Engine {
+			case "mysql":
+				portVal = 3306
+			case "redis":
+				portVal = 6379
+			default:
+				portVal = 5432
+			}
 		}
 		dbName := dbCfg.Name
 		if dbName == "" {
@@ -151,11 +165,22 @@ func generateHelmChart(appName, namespace, image string, port, replicas int, ing
 		if dbUser == "" {
 			dbUser = appName + "_user"
 		}
+		var defaultDbImage string
+		switch dbCfg.Engine {
+		case "mysql":
+			defaultDbImage = "mysql:8.0"
+		case "redis":
+			defaultDbImage = "redis:7-alpine"
+		default:
+			defaultDbImage = "postgres:16-alpine"
+		}
+
 		extraValues.WriteString(fmt.Sprintf(`
 database:
   enabled: true
   engine: %s
   topology: %s # shared (managed/external) or dedicated (in-cluster)
+  image: "%s"
   host: "%s"
   port: %d
   name: "%s"
@@ -166,20 +191,30 @@ database:
   migration:
     enabled: %t
     image: "migrate/migrate:v4.17.0"
-`, dbCfg.Engine, dbCfg.Topology, host, portVal, dbName, dbUser, appName, dbCfg.Migration))
+`, dbCfg.Engine, dbCfg.Topology, defaultDbImage, host, portVal, dbName, dbUser, appName, dbCfg.Migration))
 	}
 
 	if msgCfg != nil && msgCfg.Enabled {
+		msgHost := msgCfg.Host
+		if msgHost == "" {
+			msgHost = "rabbitmq.infra.svc.cluster.local"
+		}
+		msgPort := msgCfg.Port
+		if msgPort <= 0 {
+			msgPort = 5672
+		}
+
 		extraValues.WriteString(fmt.Sprintf(`
 rabbitmq:
   enabled: true
+  image: "rabbitmq:3.13-management-alpine"
   host: "%s"
   port: %d
   user: "guest"
   secretRef:
     name: "%s-rabbitmq-secret"
     passwordKey: "password"
-`, msgCfg.Host, msgCfg.Port, appName))
+`, msgHost, msgPort, appName))
 	}
 
 	files := map[string]string{
@@ -190,6 +225,41 @@ type: application
 version: 0.1.0
 appVersion: "1.0.0"
 `, appName, appName),
+
+		filepath.Join(chartDir, "values.schema.json"): `{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Values",
+  "type": "object",
+  "required": [
+    "replicaCount",
+    "image",
+    "service"
+  ],
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "image": {
+      "type": "object",
+      "required": ["repository"],
+      "properties": {
+        "repository": { "type": "string" },
+        "pullPolicy": { "type": "string" },
+        "tag": { "type": "string" }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["type", "port"],
+      "properties": {
+        "type": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    }
+  }
+}
+`,
 
 		filepath.Join(chartDir, "values.yaml"): fmt.Sprintf(`replicaCount: %d
 
@@ -556,10 +626,10 @@ spec:
         fsGroup: 999
       containers:
         - name: database
-          image: "postgres:16-alpine"
+          image: {{ .Values.database.image | default "postgres:16-alpine" | quote }}
           ports:
-            - containerPort: 5432
-              name: postgres
+            - containerPort: {{ .Values.database.port | default 5432 }}
+              name: db
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
@@ -578,7 +648,13 @@ spec:
               command:
                 - /bin/sh
                 - -c
+                {{- if eq .Values.database.engine "mysql" }}
+                - exec mysqladmin ping -h localhost
+                {{- else if eq .Values.database.engine "redis" }}
+                - exec redis-cli ping
+                {{- else }}
                 - exec pg_isready -U {{ .Values.database.user }} -d {{ .Values.database.name }}
+                {{- end }}
             initialDelaySeconds: 15
             periodSeconds: 10
           readinessProbe:
@@ -586,9 +662,39 @@ spec:
               command:
                 - /bin/sh
                 - -c
+                {{- if eq .Values.database.engine "mysql" }}
+                - exec mysqladmin ping -h localhost
+                {{- else if eq .Values.database.engine "redis" }}
+                - exec redis-cli ping
+                {{- else }}
                 - exec pg_isready -U {{ .Values.database.user }} -d {{ .Values.database.name }}
+                {{- end }}
             initialDelaySeconds: 5
             periodSeconds: 5
+          {{- if eq .Values.database.engine "mysql" }}
+          env:
+            - name: MYSQL_DATABASE
+              value: {{ .Values.database.name | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.database.user | quote }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretRef.name }}
+                  key: {{ .Values.database.secretRef.passwordKey }}
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretRef.name }}
+                  key: {{ .Values.database.secretRef.passwordKey }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          {{- else if eq .Values.database.engine "redis" }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- else }}
           env:
             - name: POSTGRES_DB
               value: {{ .Values.database.name | quote }}
@@ -602,6 +708,7 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+          {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -620,9 +727,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 5432
-      targetPort: 5432
-      name: postgres
+    - port: {{ .Values.database.port | default 5432 }}
+      targetPort: {{ .Values.database.port | default 5432 }}
+      name: db
   selector:
     app.kubernetes.io/name: {{ include "%s.name" . }}-db
 {{- end }}

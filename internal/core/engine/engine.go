@@ -102,6 +102,51 @@ func (e *Engine) PrintDiff(plan *CompositePlan, useColor bool) {
 		plan.ToCreate, plan.ToUpdate, plan.ToDelete, plan.Unchanged)
 }
 
+// PrintSummary renders a high-level summary table of changes grouped by module.
+func (e *Engine) PrintSummary(plan *CompositePlan) {
+	hasMutations := plan.ToCreate > 0 || plan.ToUpdate > 0 || plan.ToDelete > 0
+	if !hasMutations {
+		fmt.Fprintf(e.out, "\n✓ No infrastructure changes planned for environment [%s]. All %d resources are up to date.\n", plan.Environment, plan.Unchanged)
+		return
+	}
+
+	fmt.Fprintf(e.out, "\n=== Execution Plan Summary [%s] ===\n\n", plan.Environment)
+	fmt.Fprintf(e.out, "  %-32s %-16s %s\n", "MODULE", "STATUS", "FILES")
+	fmt.Fprintf(e.out, "  %s\n", strings.Repeat("─", 62))
+	for _, mp := range plan.ModulePlans {
+		if len(mp.FileChanges) == 0 {
+			continue
+		}
+		var created, updated, deleted, unchanged int
+		for _, fc := range mp.FileChanges {
+			switch fc.Action {
+			case diff.ActionCreate:
+				created++
+			case diff.ActionUpdate:
+				updated++
+			case diff.ActionDelete:
+				deleted++
+			case diff.ActionNone:
+				unchanged++
+			}
+		}
+		status := ""
+		if created > 0 && updated == 0 && deleted == 0 {
+			status = fmt.Sprintf("+%d to create", created)
+		} else if created == 0 && updated > 0 && deleted == 0 {
+			status = fmt.Sprintf("~%d to update", updated)
+		} else if created == 0 && updated == 0 && deleted == 0 && unchanged > 0 {
+			status = "up to date"
+		} else {
+			status = fmt.Sprintf("+%d ~%d -%d", created, updated, deleted)
+		}
+		fmt.Fprintf(e.out, "  %-32s %-16s %d file(s)\n", mp.ModuleName, status, len(mp.FileChanges))
+	}
+	fmt.Fprintf(e.out, "  %s\n", strings.Repeat("─", 62))
+	fmt.Fprintf(e.out, "\nTotal: %d to create, %d to update, %d to delete, %d unchanged.\n",
+		plan.ToCreate, plan.ToUpdate, plan.ToDelete, plan.Unchanged)
+}
+
 // Apply executes the plan after preview and explicit confirmation.
 func (e *Engine) Apply(ctx context.Context, plan *CompositePlan, autoApprove bool) error {
 	hasMutations := plan.ToCreate > 0 || plan.ToUpdate > 0 || plan.ToDelete > 0
@@ -120,10 +165,15 @@ func (e *Engine) Apply(ctx context.Context, plan *CompositePlan, autoApprove boo
 		}
 	}
 
+	fmt.Fprintln(e.out, "\nApplying changes across active modules:")
 	for _, mp := range plan.ModulePlans {
+		if len(mp.FileChanges) == 0 {
+			continue
+		}
 		if err := plugin.ExecutePlan(mp); err != nil {
 			return fmt.Errorf("failed applying changes for module '%s': %w", mp.ModuleName, err)
 		}
+		fmt.Fprintf(e.out, "  [✓] %-25s (%d file(s) synchronized)\n", mp.ModuleName, len(mp.FileChanges))
 	}
 
 	fmt.Fprintln(e.out, "\n✓ Apply completed successfully!")

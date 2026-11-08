@@ -472,20 +472,20 @@ func checkSecurityRules(res RawK8sResource, file string) []Issue {
 func checkConsistency(resources []RawK8sResource, files []string) []Issue {
 	var issues []Issue
 
-	deployments := make(map[string]RawK8sResource)
+	workloads := make(map[string]RawK8sResource)
 	services := make(map[string]RawK8sResource)
 	fileMap := make(map[string]string)
 
 	for i, r := range resources {
 		fileMap[r.Kind+"/"+r.Metadata.Name] = files[i]
-		if r.Kind == "Deployment" {
-			deployments[r.Metadata.Name] = r
+		if r.Kind == "Deployment" || r.Kind == "StatefulSet" || r.Kind == "DaemonSet" {
+			workloads[r.Metadata.Name] = r
 		} else if r.Kind == "Service" {
 			services[r.Metadata.Name] = r
 		}
 	}
 
-	// CON001: Service selector matching Deployment labels
+	// CON001: Service selector matching workload template labels
 	for svcName, svc := range services {
 		selector, ok := svc.Spec["selector"].(map[string]any)
 		if !ok || len(selector) == 0 {
@@ -493,8 +493,8 @@ func checkConsistency(resources []RawK8sResource, files []string) []Issue {
 		}
 
 		matchedAny := false
-		for _, dep := range deployments {
-			tmpl, ok := dep.Spec["template"].(map[string]any)
+		for _, w := range workloads {
+			tmpl, ok := w.Spec["template"].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -520,13 +520,13 @@ func checkConsistency(resources []RawK8sResource, files []string) []Issue {
 			}
 		}
 
-		if len(deployments) > 0 && !matchedAny {
+		if len(workloads) > 0 && !matchedAny {
 			issues = append(issues, Issue{
 				RuleID:   "CON001",
 				Severity: SeverityError,
 				Resource: "Service/" + svcName,
 				File:     fileMap["Service/"+svcName],
-				Message:  "Service selector does not match any Deployment template labels",
+				Message:  "Service selector does not match any Deployment or StatefulSet template labels",
 			})
 		}
 	}

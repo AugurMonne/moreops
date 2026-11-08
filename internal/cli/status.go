@@ -67,6 +67,12 @@ var statusCmd = &cobra.Command{
 		if cfg.Modules.Storage != nil && cfg.Modules.Storage.Enabled {
 			cmd.Printf("  [✓] Storage:       provider=%s, bucket=%s\n", cfg.Modules.Storage.Provider, cfg.Modules.Storage.Bucket)
 		}
+		if cfg.Modules.Database != nil && cfg.Modules.Database.Enabled {
+			cmd.Printf("  [✓] Database:      engine=%s, topology=%s, migration=%t\n", cfg.Modules.Database.Engine, cfg.Modules.Database.Topology, cfg.Modules.Database.Migration)
+		}
+		if cfg.Modules.Messaging != nil && cfg.Modules.Messaging.Enabled {
+			cmd.Printf("  [✓] Messaging:     broker=%s, port=%d\n", cfg.Modules.Messaging.Broker, cfg.Modules.Messaging.Port)
+		}
 		if cfg.Modules.CICD != nil && cfg.Modules.CICD.Enabled {
 			gitops := "none"
 			if cfg.Modules.CICD.GitOps != nil && cfg.Modules.CICD.GitOps.Enabled {

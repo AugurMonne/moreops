@@ -6,9 +6,10 @@ Comprehensive reference for all MoreOps CLI commands.
 
 ### General Commands
 
-- `moreops init`: Interactive onboarding wizard with language/framework detection.
-- `moreops status`: Show project metadata, active environments, and manifests on disk.
-- `moreops doctor`: Diagnostic report of installed CLI tools.
+- `moreops init`: Interactive onboarding wizard with language/framework detection. Features arrow navigation (`↑`/`↓` or `j`/`k`), checkbox multi-select (`Space`), quick numeric jump keys (`1-N`), and fallback for non-TTY pipelines.
+- `moreops status [--live]`: Show project metadata, active modules, and query live Kubernetes cluster pods & HPA.
+- `moreops doctor [--fix]`: Comprehensive environment, toolchain, and secret hygiene check. `--fix` (`-f`) automatically fixes file permissions (0600) and `.gitignore`.
+- `moreops diagnose [--env <env>] [--namespace <ns>]` (aliases: `troubleshoot`, `debug`): Root cause analysis for failing pods (`CrashLoopBackOff`, `OOMKilled` exit 137, `ImagePullBackOff`, restarts) with actionable fix suggestions.
 - `moreops version`: Display MoreOps version.
 - `moreops completion [bash|zsh|fish]`: Generate shell autocompletion script.
 
@@ -16,8 +17,8 @@ Comprehensive reference for all MoreOps CLI commands.
 
 ### Manifests & Engine
 
-- `moreops plan [--env <env>] [--config <path>]`: Generate diff without mutating files.
-- `moreops apply [--env <env>] [--yes]`: Apply changes with unified diff preview and confirmation.
+- `moreops plan [--env <env>] [--config <path>] [--summary]`: Generate diff without mutating files. Flag `--summary` (`-s`) outputs a high-level module status table instead of raw YAML diffs.
+- `moreops apply [--env <env>] [--yes]`: Apply changes with preview, interactive confirmation, and modular per-component synchronization progress. Use `--yes` for CI/CD pipelines.
 - `moreops generate [--env <env>] [--module <name>]`: Directly generate manifests for a specific module.
 - `moreops validate [--config <path>] [--security] [--rbac]`: Static security linter and YAML/source code audit.
 

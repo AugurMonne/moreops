@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	planEnv    string
-	planConfig string
+	planEnv     string
+	planConfig  string
+	planSummary bool
 )
 
 var planCmd = &cobra.Command{
@@ -24,6 +25,9 @@ to files, manifests, and configurations for the specified environment.
 Plan performs dry-run comparison and never mutates any files on disk.`,
 	Example: `  # Preview planned changes for default dev environment
   moreops plan
+
+  # Preview high-level module and resource summary without raw diffs
+  moreops plan --summary
 
   # Preview planned changes for production environment
   moreops plan --env prod
@@ -42,7 +46,11 @@ Plan performs dry-run comparison and never mutates any files on disk.`,
 			return fmt.Errorf("plan error: %w", err)
 		}
 
-		eng.PrintDiff(plan, true)
+		if planSummary {
+			eng.PrintSummary(plan)
+		} else {
+			eng.PrintDiff(plan, true)
+		}
 		return nil
 	},
 }
@@ -50,5 +58,6 @@ Plan performs dry-run comparison and never mutates any files on disk.`,
 func init() {
 	planCmd.Flags().StringVarP(&planEnv, "env", "e", "dev", "Target environment name (e.g. dev, prod)")
 	planCmd.Flags().StringVarP(&planConfig, "config", "c", config.DefaultConfigFileName, "Path to moreops.yaml")
+	planCmd.Flags().BoolVarP(&planSummary, "summary", "s", false, "Display high-level resource summary instead of full unified diff")
 	rootCmd.AddCommand(planCmd)
 }

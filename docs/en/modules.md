@@ -89,9 +89,11 @@ Every module in MoreOps operates independently and can be toggled in the `module
 Connect microservices to databases easily with support for local development, staging, and production topologies.
 
 ### Supported Engines:
-- **`postgres` (PostgreSQL, Recommended)**: `postgres:16-alpine`, port 5432.
-- **`mysql` (MySQL)**: `mysql:8.0`, port 3306.
-- **`redis` (Redis)**: `redis:7-alpine`, port 6379.
+- **`postgres` (PostgreSQL, Recommended)**: reliable stable `postgres:16-alpine`, port 5432.
+- **`mysql` (MySQL)**: LTS image `mysql:8.0`, port 3306.
+- **`redis` (Redis)**: lightweight `redis:7-alpine`, port 6379.
+
+> All default images are defined in `.Values.database.image` and can be easily overridden.
 
 ### Cluster Topologies (What you choose & What you get):
 1. **`shared` — Shared / Managed Cloud DB (Recommended for Production)**:
@@ -103,9 +105,9 @@ Connect microservices to databases easily with support for local development, st
 2. **`dedicated` — Dedicated In-Cluster Database**:
    * **Use Case:** Isolated QA environments, review apps, and local testing.
    * **What You Get:**
-     - StatefulSet manifest (`charts/<app>/templates/database-statefulset.yaml`) with 10Gi PersistentVolumeClaim and Service.
+     - StatefulSet manifest (`charts/<app>/templates/database-statefulset.yaml`) with 10Gi PersistentVolumeClaim (dynamically configured for `postgres:16-alpine`, `mysql:8.0`, or `redis:7-alpine`) and Service.
      - Hardened Security Context: `runAsNonRoot: true`, `runAsUser: 999`, `allowPrivilegeEscalation: false`, `capabilities: drop: ["ALL"]`.
-     - Automated readiness and liveness health checks using `pg_isready`.
+     - Automated readiness and liveness health checks (`pg_isready`, `mysqladmin ping`, or `redis-cli ping`).
 
 ### Pre-upgrade Database Migration Job (Helm Hook):
 - **`migration: true`**:
