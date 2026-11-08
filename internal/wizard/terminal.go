@@ -7,8 +7,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
-	"unsafe"
 )
 
 // Choice represents a selectable item in a TUI menu.
@@ -24,13 +22,6 @@ type fdGetter interface {
 	Fd() uintptr
 }
 
-// isTerminal checks if the given file descriptor is connected to a terminal.
-func isTerminal(fd uintptr) bool {
-	var termios syscall.Termios
-	_, _, err := syscall.Syscall6(syscall.SYS_IOCTL, fd, uintptr(syscall.TCGETS), uintptr(unsafe.Pointer(&termios)), 0, 0, 0)
-	return err == 0
-}
-
 // IsInteractive checks if both input and output are interactive terminals.
 func IsInteractive(in io.Reader, out io.Writer) bool {
 	inFile, inOk := in.(fdGetter)
@@ -39,34 +30,6 @@ func IsInteractive(in io.Reader, out io.Writer) bool {
 		return false
 	}
 	return isTerminal(inFile.Fd()) && isTerminal(outFile.Fd())
-}
-
-// makeRaw puts the terminal into raw mode to read single keypresses.
-func makeRaw(fd int) (*syscall.Termios, error) {
-	var oldTermios syscall.Termios
-	_, _, err := syscall.Syscall6(syscall.SYS_IOCTL, uintptr(fd), uintptr(syscall.TCGETS), uintptr(unsafe.Pointer(&oldTermios)), 0, 0, 0)
-	if err != 0 {
-		return nil, err
-	}
-
-	raw := oldTermios
-	raw.Lflag &^= syscall.ECHO | syscall.ICANON
-	raw.Cc[syscall.VMIN] = 1
-	raw.Cc[syscall.VTIME] = 0
-
-	_, _, err = syscall.Syscall6(syscall.SYS_IOCTL, uintptr(fd), uintptr(syscall.TCSETS), uintptr(unsafe.Pointer(&raw)), 0, 0, 0)
-	if err != 0 {
-		return nil, err
-	}
-
-	return &oldTermios, nil
-}
-
-// restoreTerminal restores the previous terminal settings.
-func restoreTerminal(fd int, old *syscall.Termios) {
-	if old != nil {
-		syscall.Syscall6(syscall.SYS_IOCTL, uintptr(fd), uintptr(syscall.TCSETS), uintptr(unsafe.Pointer(old)), 0, 0, 0)
-	}
 }
 
 // SelectOne presents a single-choice interactive menu with arrow key navigation.

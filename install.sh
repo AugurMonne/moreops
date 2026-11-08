@@ -6,7 +6,7 @@ set -euo pipefail
 # One-liner installer for MoreOps DevOps CLI.
 # ==============================================================================
 
-REPO="forgeops/moreops"
+REPO="${MOREOPS_REPO:-AugurMonne/moreops}"
 VERSION="${MOREOPS_VERSION:-latest}"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
@@ -43,7 +43,7 @@ echo "=========================================="
 echo "      Installing MoreOps CLI ($OS/$ARCH)  "
 echo "=========================================="
 
-# Check if Go is installed to build from source if release archive is unavailable
+# 1. Check if running inside local source tree with Go
 if command -v go >/dev/null 2>&1 && [ -f "go.mod" ]; then
     echo "Found local Go development tree. Building MoreOps directly..."
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "bin/moreops" ./cmd/moreops
@@ -53,7 +53,7 @@ if command -v go >/dev/null 2>&1 && [ -f "go.mod" ]; then
     exit 0
 fi
 
-# Fallback download logic from GitHub Releases
+# 2. Check for pre-built binary release on GitHub
 if [ "$VERSION" = "latest" ]; then
     RELEASE_URL="https://github.com/${REPO}/releases/latest/download/moreops_${OS}_${ARCH}.tar.gz"
 else
@@ -63,26 +63,38 @@ fi
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-echo "Downloading MoreOps from GitHub..."
+echo "Checking for pre-built release from GitHub..."
+DOWNLOADED=false
 if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$RELEASE_URL" -o "$TMP_DIR/moreops.tar.gz" || true
+    if curl -fsSL "$RELEASE_URL" -o "$TMP_DIR/moreops.tar.gz" 2>/dev/null; then
+        DOWNLOADED=true
+    fi
 elif command -v wget >/dev/null 2>&1; then
-    wget -q "$RELEASE_URL" -O "$TMP_DIR/moreops.tar.gz" || true
+    if wget -q "$RELEASE_URL" -O "$TMP_DIR/moreops.tar.gz" 2>/dev/null; then
+        DOWNLOADED=true
+    fi
 fi
 
-if [ -f "$TMP_DIR/moreops.tar.gz" ] && [ -s "$TMP_DIR/moreops.tar.gz" ]; then
+if [ "$DOWNLOADED" = true ] && [ -f "$TMP_DIR/moreops.tar.gz" ] && [ -s "$TMP_DIR/moreops.tar.gz" ]; then
     tar -xzf "$TMP_DIR/moreops.tar.gz" -C "$TMP_DIR"
     $SUDO cp "$TMP_DIR/moreops" "$INSTALL_DIR/moreops"
     $SUDO chmod +x "$INSTALL_DIR/moreops"
     echo "✓ MoreOps installed successfully to $INSTALL_DIR/moreops"
 else
-    # If downloading prebuilt binary fails and go is installed, try go install
-    if command -v go >/dev/null 2>&1; then
-        echo "Pre-built release not yet available. Installing via 'go install'..."
-        go install "github.com/${REPO}/cmd/moreops@latest"
-        echo "✓ Installed via go install ($GOPATH/bin/moreops or ~/go/bin/moreops)"
+    # 3. Fallback: If no pre-built release on GitHub yet, but user has git and go, clone & build!
+    if command -v git >/dev/null 2>&1 && command -v go >/dev/null 2>&1; then
+        echo "Pre-built release not yet published on GitHub."
+        echo "Building MoreOps from source repository (https://github.com/${REPO})..."
+        BUILD_DIR="$(mktemp -d)"
+        git clone --depth 1 "https://github.com/${REPO}.git" "$BUILD_DIR"
+        (cd "$BUILD_DIR" && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o moreops ./cmd/moreops)
+        $SUDO cp "$BUILD_DIR/moreops" "$INSTALL_DIR/moreops"
+        $SUDO chmod +x "$INSTALL_DIR/moreops"
+        rm -rf "$BUILD_DIR"
+        echo "✓ MoreOps compiled and installed successfully to $INSTALL_DIR/moreops"
     else
-        echo "❌ Installation failed. Please install Go or download pre-compiled binary manually."
+        echo "❌ Pre-built release not found at: $RELEASE_URL"
+        echo "To install from source, please ensure 'git' and 'go' are installed."
         exit 1
     fi
 fi
