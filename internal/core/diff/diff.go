@@ -19,10 +19,27 @@ const (
 
 // FileChange represents a planned change to a file.
 type FileChange struct {
-	Path    string
-	OldData string
-	NewData string
-	Action  FileAction
+	Path      string
+	OldData   string
+	NewData   string
+	Action    FileAction
+	Protected bool
+}
+
+// IsProtected checks if content contains protective ignore annotations.
+func IsProtected(content string) bool {
+	lines := strings.Split(content, "\n")
+	checkLines := 10
+	if len(lines) < checkLines {
+		checkLines = len(lines)
+	}
+	for i := 0; i < checkLines; i++ {
+		line := strings.TrimSpace(lines[i])
+		if strings.Contains(line, "moreops:ignore") || strings.Contains(line, "moreops:custom") || strings.Contains(line, "moreops:protect") {
+			return true
+		}
+	}
+	return false
 }
 
 // ComputeFileChange compares existing file content on disk with desired new content.
@@ -41,6 +58,12 @@ func ComputeFileChange(path, newContent string) (FileChange, error) {
 	}
 
 	fc.OldData = string(data)
+	if IsProtected(fc.OldData) {
+		fc.Protected = true
+		fc.Action = ActionNone
+		return fc, nil
+	}
+
 	if fc.OldData == fc.NewData {
 		fc.Action = ActionNone
 	} else {
@@ -88,7 +111,11 @@ func UnifiedDiff(fc FileChange, useColor bool) string {
 		sb.WriteString(fmt.Sprintf("%s+++ b/%s%s\n", yellow, fc.Path, reset))
 		sb.WriteString(simpleLineDiff(fc.OldData, fc.NewData, green, red, reset))
 	case ActionNone:
-		sb.WriteString(fmt.Sprintf("%s# %s (unchanged)%s\n", cyan, fc.Path, reset))
+		if fc.Protected {
+			sb.WriteString(fmt.Sprintf("%s# %s (custom protected by # moreops:ignore - skipped)%s\n", yellow, fc.Path, reset))
+		} else {
+			sb.WriteString(fmt.Sprintf("%s# %s (unchanged)%s\n", cyan, fc.Path, reset))
+		}
 	}
 
 	return sb.String()
@@ -133,8 +160,15 @@ func simpleLineDiff(oldStr, newStr, green, red, reset string) string {
 	return sb.String()
 }
 
-// WriteFile writes content ensuring parent directories exist.
+// WriteFile writes content ensuring parent directories exist, respecting protection.
 func WriteFile(path, content string) error {
+	if existing, err := os.ReadFile(path); err == nil {
+		if IsProtected(string(existing)) {
+			// Skip overwriting protected file
+			return nil
+		}
+	}
+
 	dir := filepath.Dir(path)
 	if dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {

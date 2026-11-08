@@ -7,6 +7,7 @@ import (
 	"moreops/internal/core/config"
 	"moreops/internal/core/diff"
 	"moreops/internal/core/plugin"
+	"moreops/internal/core/template"
 )
 
 // Module implements Dockerfile, .dockerignore, and Docker Compose management.
@@ -44,7 +45,7 @@ func (m *Module) Plan(ctx context.Context, cfg *config.Config, envName string) (
 	var dockerfileContent string
 	switch cfg.Project.Language {
 	case "go":
-		dockerfileContent = fmt.Sprintf(`# Build stage
+		defaultGo := fmt.Sprintf(`# Build stage
 FROM golang:1.22-alpine AS builder
 WORKDIR /src
 RUN apk add --no-cache ca-certificates git
@@ -61,6 +62,7 @@ USER 65532:65532
 EXPOSE %d
 ENTRYPOINT ["/app/server"]
 `, port)
+		dockerfileContent = template.Resolve("docker/go", defaultGo)
 
 	case "node":
 		dockerfileContent = fmt.Sprintf(`# Build stage
@@ -151,7 +153,7 @@ vendor
 
 	// 3. Compose file if enabled
 	if cfg.Modules.Containers.Compose {
-		composeContent := fmt.Sprintf(`version: "3.8"
+		defaultCompose := fmt.Sprintf(`version: "3.8"
 
 services:
   app:
@@ -171,6 +173,7 @@ services:
       timeout: 5s
       retries: 3
 `, cfg.Project.Name, port, port, port, port)
+		composeContent := template.Resolve("docker/compose", defaultCompose)
 
 		fcComp, err := diff.ComputeFileChange("docker-compose.yml", composeContent)
 		if err != nil {

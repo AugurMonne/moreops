@@ -111,3 +111,41 @@
 
 - `moreops iac apply [--yes]`
   Применение изменений OpenTofu/Terraform с подтверждением.
+
+---
+
+### Кастомизация шаблонов и защита файлов (`moreops template`)
+
+- `moreops template list`
+  Вывод каталога доступных для кастомизации шаблонов (Dockerfile, Helm deployment, values, GitLab CI, GitHub Actions, Jenkins).
+
+- `moreops template eject [template-id | all] [--dir .moreops/templates]`
+  Извлечение встроенных шаблонов в `.moreops/templates/` для свободного редактирования под нужды open-source проекта. MoreOps автоматически использует файлы из этой директории при генерации.
+
+- **Защита ручных правок:** Добавление комментария `# moreops:ignore` или `# moreops:custom` в первые 10 строк любого сгенерированного файла защищает его от перезаписи командами `moreops apply` и `moreops plan`.
+
+---
+
+### Управление секретами (`moreops secrets`)
+
+- `moreops secrets init`
+  Инициализация локального ключа шифрования AES-256-GCM (`.moreops/secrets.key` с правами `0600`) и конфигурации `.sops.yaml`. Ключ автоматически добавляется в `.gitignore`.
+
+- `moreops secrets template [name] [--backend vault|aws|gcp|azure] [--namespace default]`
+  Генерация готовых манифестов `SecretStore` и `ExternalSecret` для External Secrets Operator.
+
+- `moreops secrets encrypt <file>`
+  Шифрование файла с секретами через SOPS или встроенный нативный AES-256-GCM.
+
+- `moreops secrets decrypt <file>`
+  Расшифровка секретов для редактирования или деплоя.
+
+---
+
+### Диагностика и статус (`moreops doctor`, `moreops status`)
+
+- `moreops doctor`
+  Комплексный аудит инструментов разработчика (Docker daemon, kubectl, helm, git), валидности конфигураций, отсутствия открытых токенов/паролей в кодовой базе и проверки прав доступа к чувствительным файлам.
+
+- `moreops status [--live] [--env dev]`
+  Отображение состояния проекта и активных модулей. Флаг `--live` выполняет опрос живого Kubernetes-кластера, проверяя статус подов сервиса, HPA и доступность неймспейса.
