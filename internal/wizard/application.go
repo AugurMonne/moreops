@@ -13,6 +13,18 @@ import (
 	"moreops/internal/detector"
 )
 
+const (
+	ansiReset   = "\033[0m"
+	ansiBold    = "\033[1m"
+	ansiDim     = "\033[2m"
+	ansiCyan    = "\033[36m"
+	ansiGreen   = "\033[32m"
+	ansiYellow  = "\033[33m"
+	ansiBlue    = "\033[34m"
+	ansiMagenta = "\033[35m"
+	ansiWhite   = "\033[37m"
+)
+
 // Option represents a selectable feature/component in the wizard.
 type Option struct {
 	ID          int
@@ -23,12 +35,12 @@ type Option struct {
 // DefaultOptions returns the list of available modules to choose from.
 func DefaultOptions() []Option {
 	return []Option{
-		{ID: 1, Name: "Containers & Docker", Description: "Dockerfile, Docker Compose, container builds"},
-		{ID: 2, Name: "Kubernetes Manifests", Description: "Deployment, Service, ConfigMap, Ingress, HPA"},
-		{ID: 3, Name: "Monitoring & Observability", Description: "Prometheus, Grafana, Loki, OpenTelemetry"},
-		{ID: 4, Name: "Security & Secrets", Description: "HashiCorp Vault, External Secrets Operator, Trivy"},
-		{ID: 5, Name: "Storage & Backup", Description: "S3, MinIO, Velero backup/restore"},
-		{ID: 6, Name: "CI/CD & Automation", Description: "GitHub Actions, GitLab CI, Terraform/Tofu, ArgoCD"},
+		{ID: 1, Name: "📦  Containers & Docker", Description: "Multi-stage Dockerfile, .dockerignore, docker-compose.yml"},
+		{ID: 2, Name: "☸️   Kubernetes Manifests", Description: "Helm chart (Recommended), Kustomize overlays, Raw manifests"},
+		{ID: 3, Name: "📊  Monitoring & Observability", Description: "Prometheus Operator, ServiceMonitor, Grafana dashboards"},
+		{ID: 4, Name: "🔐  Security & Secrets", Description: "HashiCorp Vault (in-cluster dev / external), ESO, strict RBAC"},
+		{ID: 5, Name: "💾  Storage & Backup", Description: "MinIO dev pod, Cloud S3 (Yandex, VK, Selectel, AWS), Velero"},
+		{ID: 6, Name: "🚀  CI/CD & GitOps Automation", Description: "Jenkins, GitHub Actions, GitLab CI, Argo CD (default), OpenTofu"},
 	}
 }
 
@@ -54,12 +66,27 @@ func NewWizard(in io.Reader, out io.Writer) *Wizard {
 	}
 }
 
+func (w *Wizard) printStep(step, total int, title string) {
+	dashes := 45 - len(title)
+	if dashes < 5 {
+		dashes = 5
+	}
+	fmt.Fprintf(w.out, "\n%s─── Step %d/%d: %s %s%s\n\n",
+		ansiCyan+ansiBold, step, total, title,
+		strings.Repeat("─", dashes), ansiReset)
+}
+
 // Ask prompts the user with a question and a default value.
 func (w *Wizard) Ask(reader *bufio.Reader, question, defaultValue string) string {
 	if defaultValue != "" {
-		fmt.Fprintf(w.out, "%s [%s]: ", question, defaultValue)
+		fmt.Fprintf(w.out, "%s?%s %s%s%s %s[%s]%s: ",
+			ansiCyan, ansiReset,
+			ansiBold, question, ansiReset,
+			ansiDim, defaultValue, ansiReset)
 	} else {
-		fmt.Fprintf(w.out, "%s: ", question)
+		fmt.Fprintf(w.out, "%s?%s %s%s%s: ",
+			ansiCyan, ansiReset,
+			ansiBold, question, ansiReset)
 	}
 
 	line, err := reader.ReadString('\n')
@@ -125,19 +152,21 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 	// Step 1: Detect project
 	info, _ := w.detector.Detect(projectDir)
 
-	fmt.Fprintln(w.out, "\n========================================")
-	fmt.Fprintln(w.out, "       MoreOps Project Wizard")
-	fmt.Fprintln(w.out, "========================================")
+	fmt.Fprintln(w.out, "\n"+ansiCyan+ansiBold+"╭──────────────────────────────────────────────────────────╮"+ansiReset)
+	fmt.Fprintln(w.out, ansiCyan+ansiBold+"│                 ✨  MoreOps Project Setup  ✨            │"+ansiReset)
+	fmt.Fprintln(w.out, ansiCyan+ansiBold+"│         Orchestrate Your Complete DevOps Workflow        │"+ansiReset)
+	fmt.Fprintln(w.out, ansiCyan+ansiBold+"╰──────────────────────────────────────────────────────────╯"+ansiReset)
 
 	if info != nil && info.Language != "" {
-		fmt.Fprintf(w.out, "🔍 Detected: %s", strings.ToUpper(info.Language))
+		fmt.Fprintf(w.out, "\n  %s🔍 Auto-detected:%s %s%s%s", ansiGreen+ansiBold, ansiReset, ansiBold+ansiWhite, strings.ToUpper(info.Language), ansiReset)
 		if info.Framework != "" {
-			fmt.Fprintf(w.out, " (%s)", info.Framework)
+			fmt.Fprintf(w.out, " %s(%s)%s", ansiDim, info.Framework, ansiReset)
 		}
 		fmt.Fprintln(w.out)
 	}
 
-	// Step 2: Basic metadata
+	// Step 1: Metadata
+	w.printStep(1, 4, "Project Metadata")
 	defaultName := "my-app"
 	if info != nil && info.Name != "" {
 		defaultName = info.Name
@@ -145,16 +174,21 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 	name := w.Ask(reader, "Project name", defaultName)
 	version := w.Ask(reader, "Project version", "0.1.0")
 
-	// Step 3: Environments
+	// Step 2: Environments
+	w.printStep(2, 4, "Target Environment")
 	envName := w.Ask(reader, "Default environment name", "dev")
 	cluster := w.Ask(reader, "Kubernetes context/cluster", "current-context")
 	namespace := w.Ask(reader, "Kubernetes namespace", "default")
 
-	// Step 4: Components multi-select
+	// Step 3: Components multi-select
+	w.printStep(3, 4, "Select Architecture Modules")
 	options := DefaultOptions()
-	fmt.Fprintln(w.out, "\nSelect components to include:")
+	fmt.Fprintln(w.out, ansiBold+"Choose components to orchestrate (Enter for recommended defaults [1 2]):"+ansiReset)
 	for _, opt := range options {
-		fmt.Fprintf(w.out, "  [%d] %-30s - %s\n", opt.ID, opt.Name, opt.Description)
+		fmt.Fprintf(w.out, "\n  %s[%d]%s %s%-34s%s\n      %s%s%s\n",
+			ansiCyan+ansiBold, opt.ID, ansiReset,
+			ansiBold, opt.Name, ansiReset,
+			ansiDim, opt.Description, ansiReset)
 	}
 	fmt.Fprintln(w.out)
 
@@ -168,6 +202,8 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 	for _, id := range selectedIDs {
 		selectedSet[id] = true
 	}
+
+	w.printStep(4, 4, "Module Configuration & Tuning")
 
 	// Build Config
 	cfg := &config.Config{
@@ -474,6 +510,36 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 			Ansible:       enableAnsible,
 		}
 	}
+
+	// Final Summary Box
+	fmt.Fprintln(w.out, "\n"+ansiGreen+ansiBold+"╭──────────────────────────────────────────────────────────╮"+ansiReset)
+	fmt.Fprintln(w.out, ansiGreen+ansiBold+"│                ✨ Configuration Summary                  │"+ansiReset)
+	fmt.Fprintln(w.out, ansiGreen+ansiBold+"├──────────────────────────────────────────────────────────┤"+ansiReset)
+	fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Project:", name+" (v"+version+")")
+	fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Environment:", envName+" (ns: "+namespace+")")
+	if cfg.Modules.Kubernetes != nil && cfg.Modules.Kubernetes.Enabled {
+		strategy := cfg.Modules.Kubernetes.Tool
+		if cfg.Modules.Kubernetes.Autoscaling != nil && cfg.Modules.Kubernetes.Autoscaling.Enabled {
+			strategy += fmt.Sprintf(" (replicas: %d-%d)", cfg.Modules.Kubernetes.Replicas, cfg.Modules.Kubernetes.Autoscaling.MaxReplicas)
+		}
+		if len(strategy) > 38 {
+			strategy = strategy[:38]
+		}
+		fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Workload:", strategy)
+	}
+	if cfg.Modules.CICD != nil && cfg.Modules.CICD.Enabled {
+		ciInfo := cfg.Modules.CICD.Provider
+		if cfg.Modules.CICD.GitOps != nil && cfg.Modules.CICD.GitOps.Enabled {
+			ciInfo += " (" + cfg.Modules.CICD.GitOps.Tool + ")"
+		}
+		if len(ciInfo) > 38 {
+			ciInfo = ciInfo[:38]
+		}
+		fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "CI/CD & GitOps:", ciInfo)
+	}
+	fmt.Fprintln(w.out, ansiGreen+ansiBold+"╰──────────────────────────────────────────────────────────╯"+ansiReset)
+	fmt.Fprintf(w.out, "\n%s✓ Configuration ready! Run '%smoreops plan%s' to preview changes.%s\n\n",
+		ansiGreen, ansiBold, ansiGreen, ansiReset)
 
 	return cfg, nil
 }
