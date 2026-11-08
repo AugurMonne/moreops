@@ -138,6 +138,55 @@ func TestKubernetesPlanWithTraefikAndCaddyIngress(t *testing.T) {
 	}
 }
 
+func TestKubernetesPlanWithEnvoyIngress(t *testing.T) {
+	m := &Module{}
+	cfg := &config.Config{
+		Project: config.ProjectMeta{
+			Name: "envoy-api",
+		},
+		Environments: map[string]config.EnvironmentConfig{
+			"dev": {
+				Cluster:   "k8s-dev",
+				Namespace: "default",
+			},
+		},
+		Modules: config.ModulesConfig{
+			Kubernetes: &config.KubernetesModuleConfig{
+				Enabled:      true,
+				Tool:         "helm",
+				Port:         8080,
+				Replicas:     2,
+				Ingress:      true,
+				IngressClass: "envoy",
+			},
+		},
+	}
+
+	plan, err := m.Plan(context.Background(), cfg, "dev")
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
+
+	var valuesContent, foundHttpRoute bool
+	for _, fc := range plan.FileChanges {
+		if strings.HasSuffix(fc.Path, "values.yaml") {
+			if strings.Contains(fc.NewData, "className: \"envoy\"") && strings.Contains(fc.NewData, "gateway.envoyproxy.io/secure") {
+				valuesContent = true
+			}
+		}
+		if strings.HasSuffix(fc.Path, "httproute.yaml") {
+			foundHttpRoute = true
+		}
+	}
+
+	if !valuesContent {
+		t.Error("expected envoy className and annotations in values.yaml")
+	}
+	if !foundHttpRoute {
+		t.Error("expected httproute.yaml in templates")
+	}
+}
+
 func TestKubernetesPlanMultiEnvironments(t *testing.T) {
 	m := &Module{}
 	cfg := &config.Config{

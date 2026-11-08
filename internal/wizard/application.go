@@ -358,7 +358,8 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 			{ID: 2, Key: "traefik", Label: "Traefik", Description: "Cloud-native edge router with dynamic discovery"},
 			{ID: 3, Key: "caddy", Label: "Caddy", Description: "Automatic HTTPS and modern lightweight proxy"},
 			{ID: 4, Key: "haproxy", Label: "HAProxy", Description: "Ultra high-load L4/L7 load balancer"},
-			{ID: 5, Key: "none", Label: "None / Custom", Description: "Skip automated Ingress generation"},
+			{ID: 5, Key: "envoy", Label: "Envoy / Envoy Gateway", Description: "Cloud-native high-performance service proxy & Gateway API"},
+			{ID: 6, Key: "none", Label: "None / Custom", Description: "Skip automated Ingress generation"},
 		}
 		ingChoice, _ := SelectOne(reader, w.in, w.out, "Ingress controller", ingressChoices, 0)
 		ingressClass := ingChoice.Key

@@ -28,6 +28,7 @@
   - `traefik` (**Traefik Ingress**): автоматические аннотации `traefik.ingress.kubernetes.io/router.entrypoints: web,websecure`, `traefik.ingress.kubernetes.io/router.tls: "true"`, `className: "traefik"`.
   - `caddy` (**Caddy Ingress**): автоматические аннотации `caddy.ingress.kubernetes.io/auto-https: "true"`, `className: "caddy"`.
   - `haproxy` (**HAProxy Ingress**): автоматические аннотации `haproxy.org/ssl-redirect: "true"`, `className: "haproxy"`.
+  - `envoy` (**Envoy / Envoy Gateway**): автоматические аннотации `gateway.envoyproxy.io/secure: "true"`, `ingress.envoyproxy.io/ssl-redirect: "true"`, `className: "envoy"`, а также поддержка Kubernetes Gateway API (`HTTPRoute`).
   - `custom`: ввод произвольного `ingressClassName` и свободных аннотаций.
 - **Kustomize**:
   - Базовые манифесты в `k8s/base/` с `kustomization.yaml`.

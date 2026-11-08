@@ -28,6 +28,7 @@ Every module in MoreOps operates independently and can be toggled in the `module
   - `traefik` (**Traefik Ingress**): `className: "traefik"`, auto-configured with Traefik router entrypoints (`traefik.ingress.kubernetes.io/router.entrypoints: web,websecure`, `traefik.ingress.kubernetes.io/router.tls: "true"`).
   - `caddy` (**Caddy Ingress**): `className: "caddy"`, auto-configured with automated TLS (`caddy.ingress.kubernetes.io/auto-https: "true"`).
   - `haproxy` (**HAProxy Ingress**): `className: "haproxy"`, auto-configured with HAProxy redirect annotations (`haproxy.org/ssl-redirect: "true"`).
+  - `envoy` (**Envoy / Envoy Gateway**): `className: "envoy"`, auto-configured with Envoy annotations (`gateway.envoyproxy.io/secure: "true"`, `ingress.envoyproxy.io/ssl-redirect: "true"`), plus native Kubernetes Gateway API (`HTTPRoute`) template support.
   - `custom`: User-specified `ingressClassName` and custom annotations.
 - **Kustomize**:
   - Base manifests in `k8s/base/` with `kustomization.yaml`.

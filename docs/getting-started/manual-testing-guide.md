@@ -9,10 +9,12 @@
 1. Перейдите в корень репозитория MoreOps и соберите бинарник:
    ```bash
    make build
+   make install
+   # либо добавьте ./bin в PATH: export PATH="$PWD/bin:$PATH"
    ```
 2. Проверьте диагностику инструментов:
    ```bash
-   ./bin/moreops doctor
+   moreops doctor
    ```
    *Ожидаемый результат*: Таблица доступности утилит (`docker`, `kubectl`, `helm`, `git` и т.д.).
 
@@ -37,7 +39,7 @@
 
 2. Запустите интерактивный мастер MoreOps:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops init
+   moreops init
    ```
    - MoreOps автоматически определит: `🔍 Detected: GO`.
    - Нажмите `Enter` на всех запросах, чтобы принять дефолты (или выберите компоненты, например `1 2 3 4 5 6` или `14`).
@@ -49,7 +51,7 @@
 
 Запустите расчет плана и unified diff:
 ```bash
-/home/augur/Documents/forgeops/bin/moreops plan
+moreops plan
 ```
 *Ожидаемый результат*:
 - В терминале отобразится цветной diff:
@@ -67,7 +69,7 @@
 
 1. Примените изменения с интерактивным подтверждением:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops apply
+   moreops apply
    ```
    - Введите `yes` в ответ на запрос `Do you want to perform these actions? (yes/no):`.
    *Ожидаемый результат*:
@@ -76,7 +78,7 @@
 
 2. Повторно выполните `plan`:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops plan
+   moreops plan
    ```
    *Ожидаемый результат*: `No infrastructure changes planned.`
 
@@ -86,7 +88,7 @@
 
 Выполните команду проверки состояния:
 ```bash
-/home/augur/Documents/forgeops/bin/moreops status
+moreops status
 ```
 *Ожидаемый результат*:
 - Вывод имени проекта, версии, активных окружений (`dev`).
@@ -99,7 +101,7 @@
 
 1. Запустите полную проверку манифестов:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops validate
+   moreops validate
    ```
    *Ожидаемый результат*:
    - `✓ Configuration syntax and parameters valid.`
@@ -108,15 +110,15 @@
 
 2. Проверьте фильтрацию аудита:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops validate --security
-   /home/augur/Documents/forgeops/bin/moreops validate --rbac
+   moreops validate --security
+   moreops validate --rbac
    ```
 
 3. **Проверка срабатывания линтера (тест на ошибку)**:
    Добавьте в любой манифест небезопасную конструкцию (например, `privileged: true` или `hostNetwork: true`):
    ```bash
    echo "      hostNetwork: true" >> charts/demo-service/templates/deployment.yaml
-   /home/augur/Documents/forgeops/bin/moreops validate
+   moreops validate
    ```
    *Ожидаемый результат*:
    - Линтер выведет `❌ [SEC006] Deployment/...: Pod spec must not set hostNetwork: true` и завершится с ошибкой.
@@ -131,11 +133,11 @@
 
 1. Проверка конфигурации мониторинга:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops monitor status
+   moreops monitor status
    ```
 2. Проверка настроек S3 / Velero:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops storage check
+   moreops storage check
    ```
 
 ---
@@ -144,19 +146,19 @@
 
 1. Просмотр текущих сред:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops env list
+   moreops env list
    ```
 2. Добавление новой среды (например, `staging`):
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops env add staging --cluster k8s-staging --namespace staging
+   moreops env add staging --cluster k8s-staging --namespace staging
    ```
 3. Сравнение параметров сред:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops env diff dev staging
+   moreops env diff dev staging
    ```
 4. Переключение среды:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops env switch staging
+   moreops env switch staging
    ```
 
 ---
@@ -165,13 +167,13 @@
 
 1. Упакуйте созданный Helm-чарт:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops chart package charts/demo-service
+   moreops chart package charts/demo-service
    ```
    *Ожидаемый результат*: Создан архив `demo-service-0.1.0.tgz`.
 
 2. Для публикации в OCI (при наличии доступа к реестру):
    ```bash
-   # /home/augur/Documents/forgeops/bin/moreops chart push demo-service-0.1.0.tgz oci://cr.yandex/crp12345/charts
+   # moreops chart push demo-service-0.1.0.tgz oci://cr.yandex/crp12345/charts
    ```
 
 ---
@@ -180,7 +182,7 @@
 
 1. Выполните бамп версии:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops release minor
+   moreops release minor
    ```
    *Ожидаемый результат*:
    - `Bumping version: 0.1.0 -> 0.2.0 (minor)`

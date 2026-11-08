@@ -6,13 +6,15 @@ A step-by-step walkthrough to test all MoreOps capabilities from your terminal.
 
 ## Step 0: Build & Environment Check
 
-1. Build the binary:
+1. Build the binary and install it locally:
    ```bash
    make build
+   make install
+   # or export ./bin to your PATH: export PATH="$PWD/bin:$PATH"
    ```
 2. Check installed dependencies:
    ```bash
-   ./bin/moreops doctor
+   moreops doctor
    ```
 
 ---
@@ -38,7 +40,7 @@ A step-by-step walkthrough to test all MoreOps capabilities from your terminal.
 
 2. Run the wizard:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops init
+   moreops init
    ```
    - Notice auto-detection: `🔍 Detected: GO`.
    - Press `Enter` to accept defaults (or select components like `1 2 3 4 5 6` or `14`).
@@ -50,7 +52,7 @@ A step-by-step walkthrough to test all MoreOps capabilities from your terminal.
 ## Step 2: Preview Changes (`moreops plan`)
 
 ```bash
-/home/augur/Documents/forgeops/bin/moreops plan
+moreops plan
 ```
 - Previews the unified diff without writing any files to disk.
 - Summarizes planned creations.
@@ -61,13 +63,13 @@ A step-by-step walkthrough to test all MoreOps capabilities from your terminal.
 
 1. Apply with confirmation:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops apply
+   moreops apply
    ```
    Type `yes` when prompted.
 2. Verify files are generated: `Dockerfile`, `.dockerignore`, `charts/demo-service/`, etc.
 3. Re-run plan:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops plan
+   moreops plan
    ```
    *Expected output*: `✓ No infrastructure changes planned for environment [dev]. All resources are up to date.`
 
@@ -76,7 +78,7 @@ A step-by-step walkthrough to test all MoreOps capabilities from your terminal.
 ## Step 4: Status Check (`moreops status`)
 
 ```bash
-/home/augur/Documents/forgeops/bin/moreops status
+moreops status
 ```
 Shows project metadata, active environments, enabled modules, and existing manifests on disk.
 
@@ -86,12 +88,12 @@ Shows project metadata, active environments, enabled modules, and existing manif
 
 1. Run full validation:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops validate
+   moreops validate
    ```
 2. Selective checks:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops validate --security
-   /home/augur/Documents/forgeops/bin/moreops validate --rbac
+   moreops validate --security
+   moreops validate --rbac
    ```
 
 ---
@@ -100,19 +102,19 @@ Shows project metadata, active environments, enabled modules, and existing manif
 
 1. List environments:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops env list
+   moreops env list
    ```
 2. Add a new environment:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops env add staging --cluster k8s-staging --namespace staging
+   moreops env add staging --cluster k8s-staging --namespace staging
    ```
 3. Diff environments:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops env diff dev staging
+   moreops env diff dev staging
    ```
 4. Switch active environment:
    ```bash
-   /home/augur/Documents/forgeops/bin/moreops env switch staging
+   moreops env switch staging
    ```
 
 ---
@@ -121,7 +123,7 @@ Shows project metadata, active environments, enabled modules, and existing manif
 
 Package the Helm chart (uses native pure Go packager if Helm is not installed):
 ```bash
-/home/augur/Documents/forgeops/bin/moreops chart package charts/demo-service
+moreops chart package charts/demo-service
 ```
 Generates `demo-service-0.1.0.tgz`.
 
@@ -131,7 +133,7 @@ Generates `demo-service-0.1.0.tgz`.
 
 Bump minor version:
 ```bash
-/home/augur/Documents/forgeops/bin/moreops release minor
+moreops release minor
 ```
 Updates `moreops.yaml`, `Chart.yaml`, and appends release notes to `CHANGELOG.md`.
 
@@ -140,6 +142,6 @@ Updates `moreops.yaml`, `Chart.yaml`, and appends release notes to `CHANGELOG.md
 ## Step 9: Cleanup
 
 ```bash
-cd /home/augur/Documents/forgeops
+cd -
 rm -rf /tmp/demo-service
 ```

@@ -129,6 +129,9 @@ func generateHelmChart(appName, namespace, image string, port, replicas int, ing
 		ingressAnnotations = `    caddy.ingress.kubernetes.io/auto-https: "true"`
 	case "haproxy":
 		ingressAnnotations = `    haproxy.org/ssl-redirect: "true"`
+	case "envoy", "envoy-gateway":
+		ingressAnnotations = `    gateway.envoyproxy.io/secure: "true"
+    ingress.envoyproxy.io/ssl-redirect: "true"`
 	default: // nginx
 		ingressAnnotations = `    nginx.ingress.kubernetes.io/ssl-redirect: "true"`
 	}
@@ -277,6 +280,8 @@ ingress:
   className: "%s"
   annotations:
 %s
+  gatewayApi: false
+  gatewayName: "eg"
   hosts:
     - host: %s.local
       paths:
@@ -556,6 +561,31 @@ spec:
                   number: {{ $.Values.service.port }}
           {{- end }}
     {{- end }}
+{{- end }}
+`, appName, appName, appName),
+
+		filepath.Join(templatesDir, "httproute.yaml"): fmt.Sprintf(`{{- if and .Values.ingress.enabled (or (eq .Values.ingress.className "envoy") (eq .Values.ingress.className "envoy-gateway")) .Values.ingress.gatewayApi -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "%s.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "%s.name" . }}
+spec:
+  parentRefs:
+    - name: {{ .Values.ingress.gatewayName | default "eg" }}
+  hostnames:
+    {{- range .Values.ingress.hosts }}
+    - {{ .host | quote }}
+    {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "%s.fullname" . }}
+          port: {{ .Values.service.port }}
 {{- end }}
 `, appName, appName, appName),
 
