@@ -133,6 +133,17 @@ MoreOps выведет diff и запросит подтверждение:
 ./bin/moreops test --ephemeral
 ```
 
+### 6. Самообновление (moreops upgrade)
+
+Чтобы обновить MoreOps до самого свежего релиза с GitHub в один клик:
+
+```bash
+moreops upgrade
+
+# Или проверить наличие обновлений без скачивания
+moreops upgrade --check
+```
+
 > 📖 **Пошаговое руководство по проверке вручную**: см. [Manual Testing Guide](docs/getting-started/manual-testing-guide.md).
 
 ---
@@ -141,9 +152,11 @@ MoreOps выведет diff и запросит подтверждение:
 
 | Пункт мастера / Опция | Доступные варианты | Что вы получаете в результате |
 | :--- | :--- | :--- |
-| **Стратегия Kubernetes** | `Helm` (Рекомендовано), `Kustomize`, `Raw Manifests` | Полноценный Helm-чарт в `charts/<app>/` с оверлеями values, Kustomize-структура в `k8s/` или чистые манифесты |
+| **Целевые окружения** | `dev`, `staging`, `prod` | Индивидуальные values-файлы (`values-dev.yaml`, `values-staging.yaml`, `values-prod.yaml`) и Kustomize-оверлеи с тонкой настройкой реплик, ресурсов, HPA, PDB и TLS |
+| **Расположение Dockerfile** | `Keep existing`, `Overwrite`, `Custom path` | Бережная защита существующего Dockerfile (`keep`), поддержка путей для монорепозиториев (`services/api/Dockerfile`) |
+| **Стратегия Kubernetes** | `Helm` (Рекомендовано), `Kustomize`, `Raw Manifests` | Полноценный Helm-чарт в `charts/<app>/` со схемой валидации `values.schema.json`, Kustomize-структура в `k8s/` или чистые манифесты |
 | **Реплики и HPA** | Начальное число подов + HPA максимум | `HorizontalPodAutoscaler` без конфликтов с GitOps (поле `replicas` в Deployment опускается при включенном HPA) |
-| **Ingress-контроллер** | `NGINX`, `Traefik`, `Caddy`, `HAProxy`, `Custom` | Автоматическая генерация Ingress манифеста с аннотациями выбранного контроллера (`className`, TLS, SSL redirect, router entrypoints) |
+| **Ingress-контроллер** | `NGINX`, `Traefik`, `Caddy`, `HAProxy`, `Envoy`, `Custom` | Автоматическая генерация Ingress манифеста с аннотациями выбранного контроллера (`className`, TLS, SSL redirect, router entrypoints, Gateway API `HTTPRoute` для Envoy) |
 | **База данных** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Проверенные стабильные образы (`postgres:16-alpine`, `mysql:8.0`, `redis:7-alpine`), готовый сервис в `docker-compose.yml` с healthcheck, проброс переменных `DB_*` и SecretRef в Kubernetes (версия переопределяется в `.Values.database.image`) |
 | **Топология БД** | `Shared / Cloud DB` vs `Dedicated In-Cluster` | Подключение к существующей Cloud DB (Yandex/AWS) без оверхеда, либо локальный `StatefulSet` с PVC 10Gi в неймспейсе с проверками готовности (`pg_isready`, `mysqladmin ping`, `redis-cli ping`) |
 | **Миграции БД** | Включение Job миграций (yes/no) | Helm pre-upgrade Job (`migrate/migrate:v4.17.0`) — блокирует деплой при ошибках миграций, защищая прод |

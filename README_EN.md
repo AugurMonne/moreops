@@ -74,6 +74,7 @@ For CI/CD pipelines, skip interactive prompt:
 ## CLI Overview
 
 - `moreops init`: Interactive project setup wizard with TUI arrow navigation (`↑`/`↓`), `Space` multi-select, and numeric jump keys.
+- `moreops upgrade [--check]`: In-place self-updater downloading the latest release for your OS/Arch from GitHub.
 - `moreops plan [--summary]`: Preview planned changes with unified diff or compact module summary table (`--summary`).
 - `moreops apply [--yes]`: Apply changes with preview, interactive confirmation, and modular per-component synchronization status.
 - `moreops diagnose [--namespace <ns>]`: Root-cause diagnostics for failing workloads, `CrashLoopBackOff`, `OOMKilled` exit 137, and warning events.

@@ -11,6 +11,7 @@ Comprehensive reference for all MoreOps CLI commands.
 - `moreops doctor [--fix]`: Comprehensive environment, toolchain, and secret hygiene check. `--fix` (`-f`) automatically fixes file permissions (0600) and `.gitignore`.
 - `moreops diagnose [--env <env>] [--namespace <ns>]` (aliases: `troubleshoot`, `debug`): Root cause analysis for failing pods (`CrashLoopBackOff`, `OOMKilled` exit 137, `ImagePullBackOff`, restarts) with actionable fix suggestions.
 - `moreops version`: Display MoreOps version.
+- `moreops upgrade [--check] [--force]` (aliases: `update`, `self-update`): Seamlessly upgrade the MoreOps CLI in-place from GitHub Releases. Checks OS and architecture, downloads the release binary, and performs an atomic update.
 - `moreops completion [bash|zsh|fish]`: Generate shell autocompletion script.
 
 ---
