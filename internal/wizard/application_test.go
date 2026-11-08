@@ -43,7 +43,9 @@ func TestWizardRunDefaults(t *testing.T) {
 	// 8. Replicas count -> Enter (default: 2)
 	// 9. Enable HPA -> Enter (default: yes)
 	// 10. Max replicas -> Enter (default: 10)
-	simulatedInput := "\n\n\n\n\n\n\n\n\n\n"
+	// 11. Database dependency -> Enter (default: 1 -> None)
+	// 12. RabbitMQ message broker -> Enter (default: no)
+	simulatedInput := "\n\n\n\n\n\n\n\n\n\n\n\n"
 	in := strings.NewReader(simulatedInput)
 	out := &bytes.Buffer{}
 
@@ -74,8 +76,8 @@ func TestWizardRunDefaults(t *testing.T) {
 }
 
 func TestWizardRunCustomSelection(t *testing.T) {
-	// Enter project name "custom-srv", version "2.0.0", env "prod", cluster "k8s-prod", ns "apps", selection "14", vault -> enter, rbac -> enter
-	simulatedInput := "custom-srv\n2.0.0\nprod\nk8s-prod\napps\n14\n\n\n"
+	// Enter project name "custom-srv", version "2.0.0", env "prod", cluster "k8s-prod", ns "apps", selection "14", vault -> enter, rbac -> enter, db -> enter, rabbitmq -> enter
+	simulatedInput := "custom-srv\n2.0.0\nprod\nk8s-prod\napps\n14\n\n\n\n\n"
 	in := strings.NewReader(simulatedInput)
 	out := &bytes.Buffer{}
 
@@ -104,5 +106,41 @@ func TestWizardRunCustomSelection(t *testing.T) {
 	}
 	if cfg.Modules.Kubernetes != nil {
 		t.Errorf("expected kubernetes module not enabled")
+	}
+}
+
+func TestWizardRunDatabaseAndRabbitMQ(t *testing.T) {
+	// project "db-app", version "1.0.0", env "dev", cluster, ns, selection "12"
+	// k8s -> enter (helm), replicas -> enter (2), hpa -> enter, max -> enter
+	// db: "2" (postgres), topology: "1" (shared), migration: "yes"
+	// rabbitmq: "yes"
+	simulatedInput := "db-app\n1.0.0\ndev\nk8s-dev\napps\n12\n\n\n\n\n2\n1\nyes\nyes\n"
+	in := strings.NewReader(simulatedInput)
+	out := &bytes.Buffer{}
+
+	w := NewWizard(in, out)
+	cfg, err := w.Run("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Modules.Database == nil || !cfg.Modules.Database.Enabled {
+		t.Fatalf("expected database module to be enabled")
+	}
+	if cfg.Modules.Database.Engine != "postgres" {
+		t.Errorf("expected engine postgres, got %s", cfg.Modules.Database.Engine)
+	}
+	if cfg.Modules.Database.Topology != "shared" {
+		t.Errorf("expected topology shared, got %s", cfg.Modules.Database.Topology)
+	}
+	if !cfg.Modules.Database.Migration {
+		t.Errorf("expected database migration enabled")
+	}
+
+	if cfg.Modules.Messaging == nil || !cfg.Modules.Messaging.Enabled {
+		t.Fatalf("expected messaging module to be enabled")
+	}
+	if cfg.Modules.Messaging.Broker != "rabbitmq" {
+		t.Errorf("expected broker rabbitmq, got %s", cfg.Modules.Messaging.Broker)
 	}
 }

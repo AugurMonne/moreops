@@ -89,3 +89,57 @@ func TestDockerPlanCustomTemplate(t *testing.T) {
 		}
 	}
 }
+
+func TestDockerPlanWithDatabaseAndRabbitMQ(t *testing.T) {
+	m := &Module{}
+	cfg := &config.Config{
+		Project: config.ProjectMeta{
+			Name:     "fullstack-app",
+			Language: "go",
+		},
+		Modules: config.ModulesConfig{
+			Containers: &config.ContainersModuleConfig{
+				Enabled: true,
+				Engine:  "docker",
+				Compose: true,
+			},
+			Database: &config.DatabaseModuleConfig{
+				Enabled: true,
+				Engine:  "postgres",
+			},
+			Messaging: &config.MessagingModuleConfig{
+				Enabled: true,
+				Broker:  "rabbitmq",
+			},
+		},
+	}
+
+	plan, err := m.Plan(context.Background(), cfg, "dev")
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
+
+	var composeContent string
+	for _, fc := range plan.FileChanges {
+		if fc.Path == "docker-compose.yml" {
+			composeContent = fc.NewData
+		}
+	}
+
+	if composeContent == "" {
+		t.Fatal("docker-compose.yml not found in plan")
+	}
+
+	if !strings.Contains(composeContent, "image: postgres:16-alpine") {
+		t.Error("expected postgres service in docker-compose.yml")
+	}
+	if !strings.Contains(composeContent, "image: rabbitmq:3-management-alpine") {
+		t.Error("expected rabbitmq service in docker-compose.yml")
+	}
+	if !strings.Contains(composeContent, "pgdata:") {
+		t.Error("expected pgdata volume in docker-compose.yml")
+	}
+	if !strings.Contains(composeContent, "condition: service_healthy") {
+		t.Error("expected service_healthy check in docker-compose.yml")
+	}
+}

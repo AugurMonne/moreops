@@ -511,6 +511,71 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 		}
 	}
 
+	// Database Dependency
+	dbChoice := w.Ask(reader, "Database dependency: [1] None, [2] PostgreSQL (Recommended), [3] MySQL, [4] Redis", "1")
+	var dbCfg *config.DatabaseModuleConfig
+	switch strings.TrimSpace(dbChoice) {
+	case "2":
+		topChoice := w.Ask(reader, "Database cluster topology: [1] Shared / Cloud DB (Managed external - Recommended for Prod), [2] Dedicated In-Cluster DB (StatefulSet with PVC)", "1")
+		topology := "shared"
+		if strings.TrimSpace(topChoice) == "2" {
+			topology = "dedicated"
+		}
+		migChoice := w.Ask(reader, "Include pre-upgrade Database Migration Job (Helm hook)? (yes/no)", "yes")
+		enableMig := strings.ToLower(strings.TrimSpace(migChoice)) == "yes" || strings.ToLower(strings.TrimSpace(migChoice)) == "y"
+
+		dbCfg = &config.DatabaseModuleConfig{
+			Enabled:   true,
+			Engine:    "postgres",
+			Topology:  topology,
+			Migration: enableMig,
+			Host:      "postgres.infra.svc.cluster.local",
+			Port:      5432,
+			Name:      name + "_db",
+			User:      name + "_user",
+		}
+	case "3":
+		topChoice := w.Ask(reader, "Database cluster topology: [1] Shared / Cloud DB (Managed external), [2] Dedicated In-Cluster DB", "1")
+		topology := "shared"
+		if strings.TrimSpace(topChoice) == "2" {
+			topology = "dedicated"
+		}
+		migChoice := w.Ask(reader, "Include pre-upgrade Database Migration Job (Helm hook)? (yes/no)", "yes")
+		enableMig := strings.ToLower(strings.TrimSpace(migChoice)) == "yes" || strings.ToLower(strings.TrimSpace(migChoice)) == "y"
+
+		dbCfg = &config.DatabaseModuleConfig{
+			Enabled:   true,
+			Engine:    "mysql",
+			Topology:  topology,
+			Migration: enableMig,
+			Host:      "mysql.infra.svc.cluster.local",
+			Port:      3306,
+			Name:      name + "_db",
+			User:      name + "_user",
+		}
+	case "4":
+		dbCfg = &config.DatabaseModuleConfig{
+			Enabled:   true,
+			Engine:    "redis",
+			Topology:  "shared",
+			Migration: false,
+			Host:      "redis.infra.svc.cluster.local",
+			Port:      6379,
+		}
+	}
+	cfg.Modules.Database = dbCfg
+
+	// Messaging Broker (RabbitMQ)
+	msgChoice := w.Ask(reader, "Include RabbitMQ message broker? (yes/no)", "no")
+	if strings.ToLower(strings.TrimSpace(msgChoice)) == "yes" || strings.ToLower(strings.TrimSpace(msgChoice)) == "y" {
+		cfg.Modules.Messaging = &config.MessagingModuleConfig{
+			Enabled: true,
+			Broker:  "rabbitmq",
+			Host:    "rabbitmq.infra.svc.cluster.local",
+			Port:    5672,
+		}
+	}
+
 	// Final Summary Box
 	fmt.Fprintln(w.out, "\n"+ansiGreen+ansiBold+"╭──────────────────────────────────────────────────────────╮"+ansiReset)
 	fmt.Fprintln(w.out, ansiGreen+ansiBold+"│                ✨ Configuration Summary                  │"+ansiReset)
@@ -526,6 +591,16 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 			strategy = strategy[:38]
 		}
 		fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Workload:", strategy)
+	}
+	if cfg.Modules.Database != nil && cfg.Modules.Database.Enabled {
+		dbSummary := fmt.Sprintf("%s (%s)", cfg.Modules.Database.Engine, cfg.Modules.Database.Topology)
+		if len(dbSummary) > 38 {
+			dbSummary = dbSummary[:38]
+		}
+		fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Database:", dbSummary)
+	}
+	if cfg.Modules.Messaging != nil && cfg.Modules.Messaging.Enabled {
+		fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Messaging:", "RabbitMQ (AMQP 5672)")
 	}
 	if cfg.Modules.CICD != nil && cfg.Modules.CICD.Enabled {
 		ciInfo := cfg.Modules.CICD.Provider

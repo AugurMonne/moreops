@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"moreops/internal/core/config"
 	"moreops/internal/core/diff"
@@ -77,7 +78,7 @@ func (m *Module) Plan(ctx context.Context, cfg *config.Config, envName string) (
 
 	switch k8sCfg.Tool {
 	case "helm":
-		changes, err := generateHelmChart(appName, namespace, image, port, replicas, k8sCfg.Ingress, hpaEnabled, minReplicas, maxReplicas, cpuTarget)
+		changes, err := generateHelmChart(appName, namespace, image, port, replicas, k8sCfg.Ingress, hpaEnabled, minReplicas, maxReplicas, cpuTarget, cfg.Modules.Database, cfg.Modules.Messaging)
 		if err != nil {
 			return nil, err
 		}
@@ -107,9 +108,58 @@ func (m *Module) Apply(ctx context.Context, plan *plugin.PlanResult) error {
 
 // ---------------- Helm Chart Generation ----------------
 
-func generateHelmChart(appName, namespace, image string, port, replicas int, ingress bool, hpaEnabled bool, minReplicas, maxReplicas, cpuTarget int) ([]diff.FileChange, error) {
+func generateHelmChart(appName, namespace, image string, port, replicas int, ingress bool, hpaEnabled bool, minReplicas, maxReplicas, cpuTarget int, dbCfg *config.DatabaseModuleConfig, msgCfg *config.MessagingModuleConfig) ([]diff.FileChange, error) {
 	chartDir := filepath.Join("charts", appName)
 	templatesDir := filepath.Join(chartDir, "templates")
+
+	var extraValues strings.Builder
+	if dbCfg != nil && dbCfg.Enabled {
+		host := dbCfg.Host
+		if host == "" {
+			host = "postgres.infra.svc.cluster.local"
+		}
+		portVal := dbCfg.Port
+		if portVal <= 0 {
+			portVal = 5432
+		}
+		dbName := dbCfg.Name
+		if dbName == "" {
+			dbName = appName + "_db"
+		}
+		dbUser := dbCfg.User
+		if dbUser == "" {
+			dbUser = appName + "_user"
+		}
+		extraValues.WriteString(fmt.Sprintf(`
+database:
+  enabled: true
+  engine: %s
+  topology: %s # shared (managed/external) or dedicated (in-cluster)
+  host: "%s"
+  port: %d
+  name: "%s"
+  user: "%s"
+  secretRef:
+    name: "%s-db-secret"
+    passwordKey: "password"
+  migration:
+    enabled: %t
+    image: "migrate/migrate:v4.17.0"
+`, dbCfg.Engine, dbCfg.Topology, host, portVal, dbName, dbUser, appName, dbCfg.Migration))
+	}
+
+	if msgCfg != nil && msgCfg.Enabled {
+		extraValues.WriteString(fmt.Sprintf(`
+rabbitmq:
+  enabled: true
+  host: "%s"
+  port: %d
+  user: "guest"
+  secretRef:
+    name: "%s-rabbitmq-secret"
+    passwordKey: "password"
+`, msgCfg.Host, msgCfg.Port, appName))
+	}
 
 	files := map[string]string{
 		filepath.Join(chartDir, "Chart.yaml"): fmt.Sprintf(`apiVersion: v2
@@ -168,7 +218,7 @@ autoscaling:
   minReplicas: %d
   maxReplicas: %d
   targetCPUUtilizationPercentage: %d
-`, replicas, image, port, ingress, appName, hpaEnabled, minReplicas, maxReplicas, cpuTarget),
+%s`, replicas, image, port, ingress, appName, hpaEnabled, minReplicas, maxReplicas, cpuTarget, extraValues.String()),
 
 		filepath.Join(chartDir, "values-dev.yaml"): fmt.Sprintf(`replicaCount: 1
 resources:
@@ -243,6 +293,36 @@ spec:
           {{- if .Values.env }}
           env:
             {{- toYaml .Values.env | nindent 12 }}
+          {{- else if or (and .Values.database .Values.database.enabled) (and .Values.rabbitmq .Values.rabbitmq.enabled) }}
+          env:
+          {{- end }}
+          {{- if and .Values.database .Values.database.enabled }}
+            - name: DB_HOST
+              value: {{ .Values.database.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: DB_NAME
+              value: {{ .Values.database.name | quote }}
+            - name: DB_USER
+              value: {{ .Values.database.user | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretRef.name }}
+                  key: {{ .Values.database.secretRef.passwordKey }}
+          {{- end }}
+          {{- if and .Values.rabbitmq .Values.rabbitmq.enabled }}
+            - name: RABBITMQ_HOST
+              value: {{ .Values.rabbitmq.host | quote }}
+            - name: RABBITMQ_PORT
+              value: {{ .Values.rabbitmq.port | quote }}
+            - name: RABBITMQ_USER
+              value: {{ .Values.rabbitmq.user | quote }}
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.rabbitmq.secretRef.name }}
+                  key: {{ .Values.rabbitmq.secretRef.passwordKey }}
           {{- end }}
           livenessProbe:
             httpGet:
@@ -344,6 +424,128 @@ spec:
         - protocol: UDP
           port: 53 # DNS
 `, appName, appName),
+	}
+
+	if dbCfg != nil && dbCfg.Enabled && dbCfg.Migration {
+		files[filepath.Join(templatesDir, "migration-job.yaml")] = fmt.Sprintf(`{{- if and .Values.database .Values.database.enabled .Values.database.migration .Values.database.migration.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "%s.fullname" . }}-migration
+  labels:
+    app.kubernetes.io/name: {{ include "%s.name" . }}-migration
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "%s.name" . }}-migration
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: migrate
+          image: {{ .Values.database.migration.image | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: DB_HOST
+              value: {{ .Values.database.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: DB_NAME
+              value: {{ .Values.database.name | quote }}
+            - name: DB_USER
+              value: {{ .Values.database.user | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretRef.name }}
+                  key: {{ .Values.database.secretRef.passwordKey }}
+{{- end }}
+`, appName, appName, appName)
+	}
+
+	if dbCfg != nil && dbCfg.Enabled && dbCfg.Topology == "dedicated" {
+		files[filepath.Join(templatesDir, "database-statefulset.yaml")] = fmt.Sprintf(`{{- if and .Values.database .Values.database.enabled (eq .Values.database.topology "dedicated") -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "%s.fullname" . }}-db
+  labels:
+    app.kubernetes.io/name: {{ include "%s.name" . }}-db
+spec:
+  serviceName: {{ include "%s.fullname" . }}-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "%s.name" . }}-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "%s.name" . }}-db
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+        - name: database
+          image: "postgres:16-alpine"
+          ports:
+            - containerPort: 5432
+              name: postgres
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.database.name | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.database.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretRef.name }}
+                  key: {{ .Values.database.secretRef.passwordKey }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "%s.fullname" . }}-db
+  labels:
+    app.kubernetes.io/name: {{ include "%s.name" . }}-db
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  selector:
+    app.kubernetes.io/name: {{ include "%s.name" . }}-db
+{{- end }}
+`, appName, appName, appName, appName, appName, appName, appName, appName)
 	}
 
 	var changes []diff.FileChange

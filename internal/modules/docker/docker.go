@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"moreops/internal/core/config"
 	"moreops/internal/core/diff"
@@ -153,6 +154,109 @@ vendor
 
 	// 3. Compose file if enabled
 	if cfg.Modules.Containers.Compose {
+		var extraEnv strings.Builder
+		var dependsOn strings.Builder
+		var extraServices strings.Builder
+		var volumes strings.Builder
+
+		if cfg.Modules.Database != nil && cfg.Modules.Database.Enabled {
+			switch cfg.Modules.Database.Engine {
+			case "mysql":
+				extraEnv.WriteString("      - DB_HOST=mysql\n      - DB_PORT=3306\n      - DB_NAME=dev_db\n      - DB_USER=dev\n      - DB_PASSWORD=dev\n")
+				dependsOn.WriteString("    depends_on:\n      mysql:\n        condition: service_healthy\n")
+				extraServices.WriteString(`
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dev_db
+      MYSQL_USER: dev
+      MYSQL_PASSWORD: dev
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - mysqldata:/var/lib/mysql
+`)
+				volumes.WriteString("\nvolumes:\n  mysqldata:\n")
+			case "redis":
+				extraEnv.WriteString("      - REDIS_HOST=redis\n      - REDIS_PORT=6379\n")
+				dependsOn.WriteString("    depends_on:\n      redis:\n        condition: service_healthy\n")
+				extraServices.WriteString(`
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redisdata:/data
+`)
+				volumes.WriteString("\nvolumes:\n  redisdata:\n")
+			default: // postgres
+				extraEnv.WriteString("      - DB_HOST=postgres\n      - DB_PORT=5432\n      - DB_NAME=dev_db\n      - DB_USER=dev\n      - DB_PASSWORD=dev\n")
+				dependsOn.WriteString("    depends_on:\n      postgres:\n        condition: service_healthy\n")
+				extraServices.WriteString(`
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: dev_db
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d dev_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+`)
+				volumes.WriteString("\nvolumes:\n  pgdata:\n")
+			}
+		}
+
+		if cfg.Modules.Messaging != nil && cfg.Modules.Messaging.Enabled {
+			extraEnv.WriteString("      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/\n      - RABBITMQ_HOST=rabbitmq\n      - RABBITMQ_PORT=5672\n")
+			if dependsOn.Len() == 0 {
+				dependsOn.WriteString("    depends_on:\n")
+			}
+			dependsOn.WriteString("      rabbitmq:\n        condition: service_healthy\n")
+			extraServices.WriteString(`
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+`)
+			if volumes.Len() == 0 {
+				volumes.WriteString("\nvolumes:\n")
+			}
+			volumes.WriteString("  rabbitmqdata:\n")
+		}
+
 		defaultCompose := fmt.Sprintf(`version: "3.8"
 
 services:
@@ -167,12 +271,13 @@ services:
     environment:
       - PORT=%d
       - ENV=development
-    healthcheck:
+%s%s    healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "%d"]
       interval: 10s
       timeout: 5s
       retries: 3
-`, cfg.Project.Name, port, port, port, port)
+%s%s`, cfg.Project.Name, port, port, port, extraEnv.String(), dependsOn.String(), port, extraServices.String(), volumes.String())
+
 		composeContent := template.Resolve("docker/compose", defaultCompose)
 
 		fcComp, err := diff.ComputeFileChange("docker-compose.yml", composeContent)

@@ -44,6 +44,29 @@ type ModulesConfig struct {
 	Security   *SecurityModuleConfig   `yaml:"security,omitempty"`
 	Storage    *StorageModuleConfig    `yaml:"storage,omitempty"`
 	CICD       *CICDModuleConfig       `yaml:"cicd,omitempty"`
+	Database   *DatabaseModuleConfig   `yaml:"database,omitempty"`
+	Messaging  *MessagingModuleConfig  `yaml:"messaging,omitempty"`
+}
+
+// DatabaseModuleConfig configures database integration and topology.
+type DatabaseModuleConfig struct {
+	Enabled   bool   `yaml:"enabled"`
+	Engine    string `yaml:"engine,omitempty"`    // postgres, mysql, redis
+	Topology  string `yaml:"topology,omitempty"`  // shared (managed external/cluster), dedicated (in-cluster)
+	Migration bool   `yaml:"migration,omitempty"` // enable pre-upgrade migration Job hook
+	Host      string `yaml:"host,omitempty"`
+	Port      int    `yaml:"port,omitempty"`
+	Name      string `yaml:"name,omitempty"`
+	User      string `yaml:"user,omitempty"`
+}
+
+// MessagingModuleConfig configures message broker integration (RabbitMQ).
+type MessagingModuleConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Broker  string `yaml:"broker,omitempty"` // rabbitmq
+	Host    string `yaml:"host,omitempty"`
+	Port    int    `yaml:"port,omitempty"`
+	VHost   string `yaml:"vhost,omitempty"`
 }
 
 // ContainersModuleConfig configures container runtime and build setup.
