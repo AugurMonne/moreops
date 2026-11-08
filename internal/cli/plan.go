@@ -18,6 +18,18 @@ var planCmd = &cobra.Command{
 	Use:     "plan",
 	Aliases: []string{"diff"},
 	Short:   "Preview infrastructure and manifest changes with unified diff",
+	Long: `Compute and display an execution plan showing all changes that MoreOps will make
+to files, manifests, and configurations for the specified environment.
+
+Plan performs dry-run comparison and never mutates any files on disk.`,
+	Example: `  # Preview planned changes for default dev environment
+  moreops plan
+
+  # Preview planned changes for production environment
+  moreops plan --env prod
+
+  # Preview using a custom config file
+  moreops plan -c /path/to/moreops.yaml -e staging`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadConfig(planConfig)
 		if err != nil {

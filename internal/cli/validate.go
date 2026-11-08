@@ -19,6 +19,23 @@ var (
 var validateCmd = &cobra.Command{
 	Use:   "validate",
 	Short: "Validate configuration and analyze Kubernetes manifests for security & consistency",
+	Long: `Performs static analysis and policy auditing on your moreops.yaml, application source code,
+and Kubernetes/Helm manifests.
+
+Features:
+  • YAML & Go source syntax auditing (SYN001, SYN002)
+  • Security linter (SEC001-SEC009: non-root, readOnlyRootFilesystem, drop ALL capabilities, requests/limits, forbidden hostPath/privileged)
+  • Reliability checks (REL001: liveness & readiness probes required)
+  • Consistency checks (CON001: Service selectors match Deployment labels)
+  • Granular filtering via --security or --rbac flags`,
+	Example: `  # Run full comprehensive audit
+  moreops validate
+
+  # Run security rules only (ideal for PR security gates)
+  moreops validate --security
+
+  # Run RBAC and consistency checks only
+  moreops validate --rbac`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadConfig(validateConfigPath)
 		if err != nil {

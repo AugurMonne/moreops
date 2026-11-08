@@ -87,3 +87,60 @@
   - Базовые манифесты OpenTofu / Terraform (`main.tf`) для провижининга инфраструктуры.
 - **Ansible**:
   - Готовый плейбук `playbook.yml` и инвентарь `inventory.ini` для базовой настройки хостов.
+
+---
+
+## 7. Базы данных (`database`)
+
+Модуль баз данных позволяет легко связать приложение с реляционными СУБД или кэшем, поддерживая как локальную разработку, так и облачные продакшен-топологии.
+
+### Доступные движки:
+- **`postgres` (PostgreSQL, Рекомендовано)**: образ `postgres:16-alpine`, порт `5432`.
+- **`mysql` (MySQL)**: образ `mysql:8.0`, порт `3306`.
+- **`redis` (Redis)**: образ `redis:7-alpine`, порт `6379`.
+
+### Топологии развертывания (Что выбрать и что вы получите):
+1. **`shared` — Общая / Managed Cloud DB (Рекомендовано для Production):**
+   * **Когда выбирать:** Если у вас уже есть СУБД в облаке (Yandex Managed PostgreSQL, AWS RDS, VK Cloud DBaaS) или централизованный кластер баз данных в служебном неймспейсе (`infra`).
+   * **Что вы получаете:**
+     - В неймспейс приложения **не** развертывается тяжелый StatefulSet, экономя ресурсы кластера.
+     - В `values.yaml` и `deployment.yaml` пробрасываются параметры подключения (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`), а пароль извлекается из `Secret` / `ExternalSecret`.
+     - В `NetworkPolicy` автоматически добавляется разрешающее egress-правило на порт базы данных (5432/3306) и HTTPS (443).
+2. **`dedicated` — Выделенная база в кластере (StatefulSet):**
+   * **Когда выбирать:** Для локальной разработки, QA, демо-стендов или динамических Review-окружений, где микросервису требуется полностью изолированная БД.
+   * **Что вы получаете:**
+     - Манифест `charts/<app>/templates/database-statefulset.yaml` со `StatefulSet`, PVC объемом `10Gi` на базе `postgres:16-alpine` и `Service` ClusterIP.
+     - Hardened Security Context: запуск от `runAsNonRoot: true`, `runAsUser: 999`, запрет эскалации привилегий (`allowPrivilegeEscalation: false`), сброс всех capabilities (`drop: ["ALL"]`).
+     - Встроенные пробы готовности и жизни через утилиту `pg_isready`.
+
+### Автоматические миграции схемы (Database Migration Job):
+- **`migration: true`**:
+  * **Что вы получаете:** Создание манифеста `charts/<app>/templates/migration-job.yaml` с аннотацией хука Helm:
+    ```yaml
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    ```
+  * Перед выкаткой новой версии сервиса Kubernetes запускает Job миграций (`migrate/migrate`). Если миграция упала, Helm прерывает деплой, защищая работающий прод от падений.
+
+### Локальная разработка (`docker-compose.yml`):
+- Автоматическое добавление контейнера базы данных с персистентным томом (`pgdata` / `mysqldata` / `redisdata`).
+- Проверка работоспособности (`healthcheck`) и строгая зависимость `depends_on: { <db>: { condition: service_healthy } }` — сервис приложения гарантированно ждет готовности базы перед стартом.
+
+---
+
+## 8. Очереди сообщений (`messaging` / RabbitMQ)
+
+Модуль очередей сообщений опционален и предназначен для микросервисов с асинхронным взаимодействием.
+
+### Что вы получаете при включении RabbitMQ:
+1. **Для Kubernetes:**
+   - В `values.yaml` прописывается блок `rabbitmq` с хостом, портом и ссылкой на Secret.
+   - В `deployment.yaml` инжектируются переменные `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` и URL вида `amqp://...`.
+   - В `NetworkPolicy` чарта добавляется egress-правило для порта `5672` (AMQP).
+2. **Для локальной разработки (`docker-compose.yml`):**
+   - Контейнер `rabbitmq:3-management-alpine` с открытыми портами:
+     - `5672` — протокол AMQP для приложения.
+     - `15672` — Web UI панели управления (Management Dashboard).
+   - Healthcheck через `rabbitmq-diagnostics -q ping`.
+   - Блок `depends_on: rabbitmq: condition: service_healthy` в контейнере приложения.
+   - Персистентный том `rabbitmqdata` для сохранения очередей при перезапусках.

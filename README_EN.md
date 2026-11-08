@@ -76,8 +76,31 @@ For CI/CD pipelines, skip interactive prompt:
 - `moreops init`: Interactive project setup wizard with auto-detection.
 - `moreops plan`: Preview planned infrastructure changes with unified diff.
 - `moreops apply`: Apply changes with interactive preview and confirmation (`--yes`).
-- `moreops generate`: Generate manifests for a specific module (`--module monitoring`).
-- `moreops status`: Show project status, environments, and on-disk manifests.
+- `moreops validate`: Security, syntax, and RBAC policy linter.
+- `moreops template [list|eject]`: Inspect and eject templates into `.moreops/templates/` for open-source customization.
+- `moreops secrets [init|template|encrypt|decrypt]`: Manage secrets, generate ExternalSecret CRDs, and encrypt files.
+- `moreops doctor`: Comprehensive diagnostics for container runtimes, tools, and secret leak detection.
+- `moreops status [--live]`: Show project status or query live Kubernetes cluster pods & HPA.
+- `moreops chart [package|push]`: Package Helm charts (native pure Go fallback) and push to OCI registries.
+- `moreops env [list|add|switch|diff]`: Multi-environment lifecycle management.
+- `moreops iac [plan|apply]`: OpenTofu / Terraform workflow execution.
+- `moreops cluster [list|create|delete]`: Ephemeral local k3d Kubernetes cluster manager.
+- `moreops test [--ephemeral]`: Run validation tests against isolated ephemeral clusters.
+
+---
+
+## What You Can Choose & What You Get
+
+| Wizard Option | Choices Available | Generated Output & Capabilities |
+| :--- | :--- | :--- |
+| **Workload Strategy** | `Helm` (Recommended), `Kustomize`, `Raw Manifests` | Full Helm chart (`charts/<app>/`) with values overlays, Kustomize overlays, or plain manifests |
+| **Replicas & HPA** | Initial replica count + HPA max replicas | HorizontalPodAutoscaler manifest without GitOps flapping conflicts |
+| **Database** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Docker Compose service with healthcheck, Kubernetes connection secrets and env injection |
+| **Database Topology** | `Shared / Cloud DB` vs `Dedicated In-Cluster` | Either connects to external cloud DB (RDS, Yandex) without cluster bloat, or deploys StatefulSet with 10Gi PVC |
+| **DB Migrations** | Enable pre-upgrade migration Job (yes/no) | Kubernetes Job with Helm hook `pre-install,pre-upgrade` preventing broken releases |
+| **RabbitMQ** | Enable AMQP message broker (yes/no) | `rabbitmq:3-management-alpine` in Compose with web UI (15672), K8s NetworkPolicy egress, and env vars |
+| **Custom Code Protection** | Add `# moreops:ignore` in any file | Prevents `moreops apply` from ever overwriting manual developer changes |
+
 - `moreops validate`: Validate YAML syntax, language code, and security rules (SEC001-SEC009).
 - `moreops monitor status`: Check Prometheus Operator ServiceMonitor and alerts.
 - `moreops storage check`: Check S3 / MinIO and Velero backup configuration.

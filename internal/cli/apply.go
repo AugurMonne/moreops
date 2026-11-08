@@ -18,6 +18,21 @@ var (
 var applyCmd = &cobra.Command{
 	Use:   "apply",
 	Short: "Apply infrastructure and manifest changes with preview and confirmation",
+	Long: `Applies the planned changes to local files, manifests, and configurations.
+
+MoreOps displays a unified color diff preview and asks for explicit user confirmation
+before applying changes, unless the --yes (-y) auto-approve flag is specified.
+
+Files marked with '# moreops:ignore' or '# moreops:custom' are automatically protected
+and will never be overwritten.`,
+	Example: `  # Preview diff and prompt for confirmation before applying
+  moreops apply
+
+  # Apply changes for production environment
+  moreops apply --env prod
+
+  # Apply changes non-interactively (ideal for CI/CD automation)
+  moreops apply --yes`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadConfig(applyConfig)
 		if err != nil {

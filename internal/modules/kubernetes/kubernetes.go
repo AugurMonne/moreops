@@ -405,7 +405,7 @@ spec:
 		filepath.Join(templatesDir, "networkpolicy.yaml"): fmt.Sprintf(`apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "%s.fullname" . }}-default-deny
+  name: {{ include "%s.fullname" . }}-networkpolicy
 spec:
   podSelector:
     matchLabels:
@@ -418,11 +418,28 @@ spec:
         - protocol: TCP
           port: {{ .Values.service.port }}
   egress:
-    - to:
-        - namespaceSelector: {}
-      ports:
+    # DNS Resolution
+    - ports:
         - protocol: UDP
-          port: 53 # DNS
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- if and .Values.database .Values.database.enabled }}
+    # Database Egress
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.database.port }}
+    {{- end }}
+    {{- if and .Values.rabbitmq .Values.rabbitmq.enabled }}
+    # RabbitMQ Broker Egress
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.rabbitmq.port }}
+    {{- end }}
+    # HTTPS Egress for external APIs and Cloud Managed DBs
+    - ports:
+        - protocol: TCP
+          port: 443
 `, appName, appName),
 	}
 
@@ -458,6 +475,13 @@ spec:
             capabilities:
               drop:
                 - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
           env:
             - name: DB_HOST
               value: {{ .Values.database.host | quote }}
@@ -508,6 +532,32 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - exec pg_isready -U {{ .Values.database.user }} -d {{ .Values.database.name }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - exec pg_isready -U {{ .Values.database.user }} -d {{ .Values.database.name }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
           env:
             - name: POSTGRES_DB
               value: {{ .Values.database.name | quote }}

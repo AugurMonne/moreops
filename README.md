@@ -125,6 +125,24 @@ MoreOps выведет diff и запросит подтверждение:
 
 ---
 
+## Что можно выбрать и что вы получаете при выборе
+
+| Пункт мастера / Опция | Доступные варианты | Что вы получаете в результате |
+| :--- | :--- | :--- |
+| **Стратегия Kubernetes** | `Helm` (Рекомендовано), `Kustomize`, `Raw Manifests` | Полноценный Helm-чарт в `charts/<app>/` с оверлеями values, Kustomize-структура в `k8s/` или чистые манифесты |
+| **Реплики и HPA** | Начальное число подов + HPA максимум | `HorizontalPodAutoscaler` без конфликтов с GitOps (поле `replicas` в Deployment опускается при включенном HPA) |
+| **База данных** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Готовый сервис в `docker-compose.yml` с healthcheck, проброс переменных `DB_*` и SecretRef в Kubernetes |
+| **Топология БД** | `Shared / Cloud DB` vs `Dedicated In-Cluster` | Подключение к существующей Cloud DB (Yandex/AWS) без оверхеда, либо локальный `StatefulSet` с PVC 10Gi в неймспейсе |
+| **Миграции БД** | Включение Job миграций (yes/no) | Helm pre-upgrade Job (`migrate/migrate`) — блокирует деплой при ошибках миграций, защищая прод |
+| **RabbitMQ** | Включение брокера (yes/no) | `rabbitmq:3-management-alpine` в Compose с Web UI (15672), сетевые политики NetworkPolicy и переменные `RABBITMQ_*` |
+| **Управление секретами** | `moreops secrets [init\|template\|encrypt]` | Локальный ключ AES-256-GCM, генерация `ExternalSecret`/`SecretStore` CRD, безопасное шифрование файлов |
+| **Кастомизация шаблонов** | `moreops template [list\|eject]` | Извлечение шаблонов в `.moreops/templates/` для open-source доработок; защита ручного кода тегом `# moreops:ignore` |
+| **Диагностика окружения** | `moreops doctor` | Проверка Docker daemon, kubectl, helm, git, прав доступа к файлам (0600) и аудит утечек токенов в конфигах |
+| **Статус живого кластера** | `moreops status --live` | Опрос активного контекста K8s: реальное состояние подов, перезапуски, утилизация HPA |
+
+
+---
+
 ## Пример конфигурации `moreops.yaml`
 
 ```yaml
