@@ -95,6 +95,7 @@ For CI/CD pipelines, skip interactive prompt:
 | :--- | :--- | :--- |
 | **Workload Strategy** | `Helm` (Recommended), `Kustomize`, `Raw Manifests` | Full Helm chart (`charts/<app>/`) with values overlays, Kustomize overlays, or plain manifests |
 | **Replicas & HPA** | Initial replica count + HPA max replicas | HorizontalPodAutoscaler manifest without GitOps flapping conflicts |
+| **Ingress Controller** | `NGINX`, `Traefik`, `Caddy`, `HAProxy`, `Custom` | Ingress manifest with automated controller annotations (`className`, TLS, SSL redirect, router entrypoints) |
 | **Database** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Docker Compose service with healthcheck, Kubernetes connection secrets and env injection |
 | **Database Topology** | `Shared / Cloud DB` vs `Dedicated In-Cluster` | Either connects to external cloud DB (RDS, Yandex) without cluster bloat, or deploys StatefulSet with 10Gi PVC |
 | **DB Migrations** | Enable pre-upgrade migration Job (yes/no) | Kubernetes Job with Helm hook `pre-install,pre-upgrade` preventing broken releases |

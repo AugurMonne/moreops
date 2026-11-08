@@ -272,12 +272,33 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 			}
 		}
 
+		ingressChoice := w.Ask(reader, "Ingress controller: [1] NGINX (Recommended), [2] Traefik, [3] Caddy, [4] HAProxy, [5] None / Custom", "1")
+		ingressClass := "nginx"
+		enableIngress := true
+		switch strings.TrimSpace(ingressChoice) {
+		case "2":
+			ingressClass = "traefik"
+		case "3":
+			ingressClass = "caddy"
+		case "4":
+			ingressClass = "haproxy"
+		case "5":
+			customChoice := w.Ask(reader, "Enable Ingress? (yes/no)", "no")
+			enableIngress = strings.ToLower(strings.TrimSpace(customChoice)) == "yes" || strings.ToLower(strings.TrimSpace(customChoice)) == "y"
+			if enableIngress {
+				ingressClass = w.Ask(reader, "Custom Ingress class name", "custom")
+			}
+		default: // "1"
+			ingressClass = "nginx"
+		}
+
 		cfg.Modules.Kubernetes = &config.KubernetesModuleConfig{
-			Enabled:  true,
-			Tool:     k8sTool,
-			Port:     defaultPort,
-			Replicas: replicas,
-			Ingress:  true,
+			Enabled:      true,
+			Tool:         k8sTool,
+			Port:         defaultPort,
+			Replicas:     replicas,
+			Ingress:      enableIngress,
+			IngressClass: ingressClass,
 			Autoscaling: &config.AutoscalingConfig{
 				Enabled:       enableHPA,
 				MinReplicas:   minReplicas,
@@ -591,6 +612,9 @@ func (w *Wizard) Run(projectDir string) (*config.Config, error) {
 			strategy = strategy[:38]
 		}
 		fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Workload:", strategy)
+	}
+	if cfg.Modules.Kubernetes != nil && cfg.Modules.Kubernetes.Enabled && cfg.Modules.Kubernetes.Ingress {
+		fmt.Fprintf(w.out, "│  %-16s %-38s │\n", "Ingress:", fmt.Sprintf("%s controller", cfg.Modules.Kubernetes.IngressClass))
 	}
 	if cfg.Modules.Database != nil && cfg.Modules.Database.Enabled {
 		dbSummary := fmt.Sprintf("%s (%s)", cfg.Modules.Database.Engine, cfg.Modules.Database.Topology)

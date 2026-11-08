@@ -15,13 +15,19 @@
 ## 2. Kubernetes (`kubernetes`)
 - **Helm Chart (дефолтный стандарт)**:
   - Структура чарта в `charts/<app>/` (Chart.yaml, values.yaml, templates/).
-  - Шаблоны: Deployment, Service, Ingress, HPA, NetworkPolicy (default-deny egress/ingress).
+  - Шаблоны: Deployment, Service, Ingress, HPA, NetworkPolicy (строгие правила с точечным egress к DNS, базам данных и брокеру).
   - Средовые оверлеи: `values-dev.yaml`, `values-prod.yaml`.
+- **Поддержка Ingress-контроллеров (Что можно выбрать и что вы получите)**:
+  - `nginx` (**NGINX Ingress**, дефолт): аннотации `nginx.ingress.kubernetes.io/ssl-redirect: "true"`, `className: "nginx"`.
+  - `traefik` (**Traefik Ingress**): автоматические аннотации `traefik.ingress.kubernetes.io/router.entrypoints: web,websecure`, `traefik.ingress.kubernetes.io/router.tls: "true"`, `className: "traefik"`.
+  - `caddy` (**Caddy Ingress**): автоматические аннотации `caddy.ingress.kubernetes.io/auto-https: "true"`, `className: "caddy"`.
+  - `haproxy` (**HAProxy Ingress**): автоматические аннотации `haproxy.org/ssl-redirect: "true"`, `className: "haproxy"`.
+  - `custom`: ввод произвольного `ingressClassName` и свободных аннотаций.
 - **Kustomize**:
   - Базовые манифесты в `k8s/base/` с `kustomization.yaml`.
   - Оверлеи окружений в `k8s/overlays/dev/` и `k8s/overlays/prod/`.
 - **Raw Manifests**:
-  - Прямые манифесты для быстрого развертывания в `k8s/`.
+  - Прямые манифесты для быстрого развертывания в `k8s/` с учетом выбранного `ingressClassName`.
 
 ---
 

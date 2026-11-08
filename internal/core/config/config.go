@@ -80,13 +80,14 @@ type ContainersModuleConfig struct {
 
 // KubernetesModuleConfig configures Kubernetes workload deployment.
 type KubernetesModuleConfig struct {
-	Enabled     bool               `yaml:"enabled"`
-	Tool        string             `yaml:"tool,omitempty"` // manifests, helm, kustomize
-	Port        int                `yaml:"port,omitempty"`
-	Replicas    int                `yaml:"replicas,omitempty"`
-	Ingress     bool               `yaml:"ingress,omitempty"`
-	ConfigMap   bool               `yaml:"configmap,omitempty"`
-	Autoscaling *AutoscalingConfig `yaml:"autoscaling,omitempty"`
+	Enabled      bool               `yaml:"enabled"`
+	Tool         string             `yaml:"tool,omitempty"` // manifests, helm, kustomize
+	Port         int                `yaml:"port,omitempty"`
+	Replicas     int                `yaml:"replicas,omitempty"`
+	Ingress      bool               `yaml:"ingress,omitempty"`
+	IngressClass string             `yaml:"ingress_class,omitempty"` // nginx, traefik, caddy, haproxy, custom
+	ConfigMap    bool               `yaml:"configmap,omitempty"`
+	Autoscaling  *AutoscalingConfig `yaml:"autoscaling,omitempty"`
 }
 
 // AutoscalingConfig defines Horizontal Pod Autoscaler policies.

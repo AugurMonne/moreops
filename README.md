@@ -131,6 +131,7 @@ MoreOps выведет diff и запросит подтверждение:
 | :--- | :--- | :--- |
 | **Стратегия Kubernetes** | `Helm` (Рекомендовано), `Kustomize`, `Raw Manifests` | Полноценный Helm-чарт в `charts/<app>/` с оверлеями values, Kustomize-структура в `k8s/` или чистые манифесты |
 | **Реплики и HPA** | Начальное число подов + HPA максимум | `HorizontalPodAutoscaler` без конфликтов с GitOps (поле `replicas` в Deployment опускается при включенном HPA) |
+| **Ingress-контроллер** | `NGINX`, `Traefik`, `Caddy`, `HAProxy`, `Custom` | Автоматическая генерация Ingress манифеста с аннотациями выбранного контроллера (`className`, TLS, SSL redirect, router entrypoints) |
 | **База данных** | `None`, `PostgreSQL`, `MySQL`, `Redis` | Готовый сервис в `docker-compose.yml` с healthcheck, проброс переменных `DB_*` и SecretRef в Kubernetes |
 | **Топология БД** | `Shared / Cloud DB` vs `Dedicated In-Cluster` | Подключение к существующей Cloud DB (Yandex/AWS) без оверхеда, либо локальный `StatefulSet` с PVC 10Gi в неймспейсе |
 | **Миграции БД** | Включение Job миграций (yes/no) | Helm pre-upgrade Job (`migrate/migrate`) — блокирует деплой при ошибках миграций, защищая прод |

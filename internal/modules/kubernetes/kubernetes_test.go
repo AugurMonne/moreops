@@ -93,3 +93,47 @@ func TestKubernetesPlanWithDatabaseAndRabbitMQ(t *testing.T) {
 		t.Error("values.yaml not found in plan")
 	}
 }
+
+func TestKubernetesPlanWithTraefikAndCaddyIngress(t *testing.T) {
+	m := &Module{}
+	cfg := &config.Config{
+		Project: config.ProjectMeta{
+			Name: "traefik-api",
+		},
+		Environments: map[string]config.EnvironmentConfig{
+			"dev": {
+				Cluster:   "k8s-dev",
+				Namespace: "default",
+			},
+		},
+		Modules: config.ModulesConfig{
+			Kubernetes: &config.KubernetesModuleConfig{
+				Enabled:      true,
+				Tool:         "helm",
+				Port:         8080,
+				Replicas:     2,
+				Ingress:      true,
+				IngressClass: "traefik",
+			},
+		},
+	}
+
+	plan, err := m.Plan(context.Background(), cfg, "dev")
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
+
+	var valuesContent string
+	for _, fc := range plan.FileChanges {
+		if strings.HasSuffix(fc.Path, "values.yaml") {
+			valuesContent = fc.NewData
+		}
+	}
+
+	if !strings.Contains(valuesContent, "className: \"traefik\"") {
+		t.Errorf("expected className traefik in values.yaml, got:\n%s", valuesContent)
+	}
+	if !strings.Contains(valuesContent, "traefik.ingress.kubernetes.io/router.entrypoints") {
+		t.Errorf("expected traefik annotations in values.yaml, got:\n%s", valuesContent)
+	}
+}

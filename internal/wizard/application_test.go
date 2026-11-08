@@ -43,9 +43,10 @@ func TestWizardRunDefaults(t *testing.T) {
 	// 8. Replicas count -> Enter (default: 2)
 	// 9. Enable HPA -> Enter (default: yes)
 	// 10. Max replicas -> Enter (default: 10)
-	// 11. Database dependency -> Enter (default: 1 -> None)
-	// 12. RabbitMQ message broker -> Enter (default: no)
-	simulatedInput := "\n\n\n\n\n\n\n\n\n\n\n\n"
+	// 11. Ingress controller -> Enter (default: 1 -> nginx)
+	// 12. Database dependency -> Enter (default: 1 -> None)
+	// 13. RabbitMQ message broker -> Enter (default: no)
+	simulatedInput := "\n\n\n\n\n\n\n\n\n\n\n\n\n"
 	in := strings.NewReader(simulatedInput)
 	out := &bytes.Buffer{}
 
@@ -111,10 +112,10 @@ func TestWizardRunCustomSelection(t *testing.T) {
 
 func TestWizardRunDatabaseAndRabbitMQ(t *testing.T) {
 	// project "db-app", version "1.0.0", env "dev", cluster, ns, selection "12"
-	// k8s -> enter (helm), replicas -> enter (2), hpa -> enter, max -> enter
+	// k8s -> enter (helm), replicas -> enter (2), hpa -> enter, max -> enter, ingress -> enter (nginx)
 	// db: "2" (postgres), topology: "1" (shared), migration: "yes"
 	// rabbitmq: "yes"
-	simulatedInput := "db-app\n1.0.0\ndev\nk8s-dev\napps\n12\n\n\n\n\n2\n1\nyes\nyes\n"
+	simulatedInput := "db-app\n1.0.0\ndev\nk8s-dev\napps\n12\n\n\n\n\n\n2\n1\nyes\nyes\n"
 	in := strings.NewReader(simulatedInput)
 	out := &bytes.Buffer{}
 
@@ -142,5 +143,27 @@ func TestWizardRunDatabaseAndRabbitMQ(t *testing.T) {
 	}
 	if cfg.Modules.Messaging.Broker != "rabbitmq" {
 		t.Errorf("expected broker rabbitmq, got %s", cfg.Modules.Messaging.Broker)
+	}
+}
+
+func TestWizardRunTraefikIngress(t *testing.T) {
+	// project "traefik-app", version "1.0.0", env "dev", cluster, ns, selection "12"
+	// k8s -> enter (helm), replicas -> enter (2), hpa -> enter, max -> enter, ingress: "2" (traefik)
+	// db -> enter (none), rabbitmq -> enter (no)
+	simulatedInput := "traefik-app\n1.0.0\ndev\nk8s-dev\napps\n12\n\n\n\n\n2\n\n\n"
+	in := strings.NewReader(simulatedInput)
+	out := &bytes.Buffer{}
+
+	w := NewWizard(in, out)
+	cfg, err := w.Run("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Modules.Kubernetes == nil || !cfg.Modules.Kubernetes.Ingress {
+		t.Fatal("expected ingress to be enabled")
+	}
+	if cfg.Modules.Kubernetes.IngressClass != "traefik" {
+		t.Errorf("expected ingressClass traefik, got %s", cfg.Modules.Kubernetes.IngressClass)
 	}
 }

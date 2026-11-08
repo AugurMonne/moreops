@@ -76,9 +76,14 @@ func (m *Module) Plan(ctx context.Context, cfg *config.Config, envName string) (
 		}
 	}
 
+	ingressClass := k8sCfg.IngressClass
+	if ingressClass == "" {
+		ingressClass = "nginx"
+	}
+
 	switch k8sCfg.Tool {
 	case "helm":
-		changes, err := generateHelmChart(appName, namespace, image, port, replicas, k8sCfg.Ingress, hpaEnabled, minReplicas, maxReplicas, cpuTarget, cfg.Modules.Database, cfg.Modules.Messaging)
+		changes, err := generateHelmChart(appName, namespace, image, port, replicas, k8sCfg.Ingress, ingressClass, hpaEnabled, minReplicas, maxReplicas, cpuTarget, cfg.Modules.Database, cfg.Modules.Messaging)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +97,7 @@ func (m *Module) Plan(ctx context.Context, cfg *config.Config, envName string) (
 		res.FileChanges = append(res.FileChanges, changes...)
 
 	default: // "manifests"
-		changes, err := generateRawManifests(appName, namespace, image, port, replicas, k8sCfg.Ingress, envName)
+		changes, err := generateRawManifests(appName, namespace, image, port, replicas, k8sCfg.Ingress, ingressClass, envName)
 		if err != nil {
 			return nil, err
 		}
@@ -108,9 +113,25 @@ func (m *Module) Apply(ctx context.Context, plan *plugin.PlanResult) error {
 
 // ---------------- Helm Chart Generation ----------------
 
-func generateHelmChart(appName, namespace, image string, port, replicas int, ingress bool, hpaEnabled bool, minReplicas, maxReplicas, cpuTarget int, dbCfg *config.DatabaseModuleConfig, msgCfg *config.MessagingModuleConfig) ([]diff.FileChange, error) {
+func generateHelmChart(appName, namespace, image string, port, replicas int, ingress bool, ingressClass string, hpaEnabled bool, minReplicas, maxReplicas, cpuTarget int, dbCfg *config.DatabaseModuleConfig, msgCfg *config.MessagingModuleConfig) ([]diff.FileChange, error) {
 	chartDir := filepath.Join("charts", appName)
 	templatesDir := filepath.Join(chartDir, "templates")
+
+	if ingressClass == "" {
+		ingressClass = "nginx"
+	}
+	var ingressAnnotations string
+	switch strings.ToLower(ingressClass) {
+	case "traefik":
+		ingressAnnotations = `    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"`
+	case "caddy":
+		ingressAnnotations = `    caddy.ingress.kubernetes.io/auto-https: "true"`
+	case "haproxy":
+		ingressAnnotations = `    haproxy.org/ssl-redirect: "true"`
+	default: // nginx
+		ingressAnnotations = `    nginx.ingress.kubernetes.io/ssl-redirect: "true"`
+	}
 
 	var extraValues strings.Builder
 	if dbCfg != nil && dbCfg.Enabled {
@@ -183,7 +204,9 @@ service:
 
 ingress:
   enabled: %t
-  className: "nginx"
+  className: "%s"
+  annotations:
+%s
   hosts:
     - host: %s.local
       paths:
@@ -218,7 +241,7 @@ autoscaling:
   minReplicas: %d
   maxReplicas: %d
   targetCPUUtilizationPercentage: %d
-%s`, replicas, image, port, ingress, appName, hpaEnabled, minReplicas, maxReplicas, cpuTarget, extraValues.String()),
+%s`, replicas, image, port, ingress, ingressClass, ingressAnnotations, appName, hpaEnabled, minReplicas, maxReplicas, cpuTarget, extraValues.String()),
 
 		filepath.Join(chartDir, "values-dev.yaml"): fmt.Sprintf(`replicaCount: 1
 resources:
@@ -360,8 +383,16 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "%s.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "%s.name" . }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
+  {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
   rules:
     {{- range .Values.ingress.hosts }}
     - host: {{ .host | quote }}
@@ -378,7 +409,7 @@ spec:
           {{- end }}
     {{- end }}
 {{- end }}
-`, appName, appName),
+`, appName, appName, appName),
 
 		filepath.Join(templatesDir, "hpa.yaml"): fmt.Sprintf(`{{- if .Values.autoscaling.enabled -}}
 apiVersion: autoscaling/v2
@@ -765,7 +796,7 @@ patches:
 
 // ---------------- Raw Manifests Generation ----------------
 
-func generateRawManifests(appName, namespace, image string, port, replicas int, ingress bool, envName string) ([]diff.FileChange, error) {
+func generateRawManifests(appName, namespace, image string, port, replicas int, ingress bool, ingressClass string, envName string) ([]diff.FileChange, error) {
 	files := map[string]string{
 		filepath.Join("k8s", "deployment.yaml"): fmt.Sprintf(`apiVersion: apps/v1
 kind: Deployment
@@ -890,14 +921,18 @@ spec:
 	}
 
 	if ingress {
+		if ingressClass == "" {
+			ingressClass = "nginx"
+		}
 		files[filepath.Join("k8s", "ingress.yaml")] = fmt.Sprintf(`apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: %s
   namespace: %s
   annotations:
-    kubernetes.io/ingress.class: nginx
+    kubernetes.io/ingress.class: %s
 spec:
+  ingressClassName: %s
   rules:
     - host: %s.local
       http:
@@ -909,7 +944,7 @@ spec:
                 name: %s
                 port:
                   number: %d
-`, appName, namespace, appName, appName, port)
+`, appName, namespace, ingressClass, ingressClass, appName, appName, port)
 	}
 
 	var changes []diff.FileChange
